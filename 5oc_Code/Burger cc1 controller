@@ -1,0 +1,116 @@
+{{/* =========================================================================
+     BURGER SHIFT  —  CC #1 : CONTROLLER
+     Trigger type : Command
+     Trigger      : burger
+     Usage        : -burger start @partner
+                    -burger key
+                    -burger status
+                    -burger abort
+     ========================================================================= */}}
+
+{{$sub := "help"}}
+{{if gt (len .Args) 1}}{{$sub = lower (index .Args 1)}}{{end}}
+{{$rec := dbGet .Channel.ID "burger"}}
+
+{{/* ---------------------------------------------------------------- HELP */}}
+{{if eq $sub "help"}}
+{{sendMessage nil (joinStr "\n"
+  "**BURGER SHIFT — commands**"
+  "`-burger start @partner` — opens the shift in this channel"
+  "`-burger key` — prints the task key"
+  "`-burger status` — current number, turn and stats"
+  "`-burger abort` — wipes the shift from this channel")}}
+{{return}}
+{{end}}
+
+{{/* ----------------------------------------------------------------- KEY */}}
+{{if eq $sub "key"}}
+{{sendMessage nil (joinStr "\n"
+  "**TASK KEY — clipboard under the LED screen**"
+  "🥩 every **prime**        → Get a patty"
+  "🍞 every **×6**           → Grab a bun"
+  "🔥 every **×8**           → Cook a patty"
+  "🥬 every **×9**           → Grab some lettuce"
+  "🍅 every **×10**          → Grab a tomato"
+  "🧀 every **×12**          → Grab a slice of cheese"
+  "🍔 every **×15**          → Assemble a burger"
+  "🛎️ every **×25**          → Serve a burger"
+  "🧽 **none of the above**  → Clean Up"
+  ""
+  "A burger needs **1 cooked patty + 1 bun** to assemble. Toppings on hand get added automatically."
+  "A burger must be assembled *before* it can be served.")}}
+{{return}}
+{{end}}
+
+{{/* --------------------------------------------------------------- ABORT */}}
+{{if eq $sub "abort"}}
+{{if not $rec}}{{sendMessage nil "No shift running in this channel."}}{{return}}{{end}}
+{{dbDel .Channel.ID "burger"}}
+{{sendMessage nil "🧹 Shift aborted. The station is clear."}}
+{{return}}
+{{end}}
+
+{{/* -------------------------------------------------------------- STATUS */}}
+{{if eq $sub "status"}}
+{{if not $rec}}{{sendMessage nil "No shift running here. `-burger start @partner`"}}{{return}}{{end}}
+{{$d := $rec.Value}}
+{{$cur := toString (index $d "p1")}}
+{{if eq (toInt (index $d "turn")) 2}}{{$cur = toString (index $d "p2")}}{{end}}
+{{sendMessage nil (printf "**Number %d/100** — up next: <@%s>\nPrepared `%d` · Served `%d` · Clean-ups `%d` · Mistakes `%d`"
+  (toInt (index $d "n")) $cur (toInt (index $d "prep")) (toInt (index $d "served")) (toInt (index $d "cleans")) (toInt (index $d "mis")))}}
+{{return}}
+{{end}}
+
+{{/* --------------------------------------------------------------- START */}}
+{{if ne $sub "start"}}{{sendMessage nil "Unknown option. Try `-burger help`."}}{{return}}{{end}}
+{{if $rec}}{{sendMessage nil "A shift is already clocked in here. `-burger abort` to reset."}}{{return}}{{end}}
+{{/* ---- resolve the partner: real mention first, raw ID / <@id> as fallback ---- */}}
+{{$p2id := ""}}
+{{if .Message.Mentions}}{{$p2id = toString (index .Message.Mentions 0).ID}}{{end}}
+{{if and (eq $p2id "") (gt (len .Args) 2)}}
+  {{$raw := reReplace "[^0-9]" (index .Args 2) ""}}
+  {{if ne $raw ""}}{{$m := getMember $raw}}{{if $m}}{{$p2id = toString $m.User.ID}}{{end}}{{end}}
+{{end}}
+
+{{if eq $p2id ""}}{{sendMessage nil "Mention your partner: `-burger start @partner` (a real ping or their user ID)."}}{{return}}{{end}}
+{{if eq $p2id (toString .User.ID)}}{{sendMessage nil "You need an actual partner. Nice try."}}{{return}}{{end}}
+
+{{$s := sdict
+  "n" 1 "turn" 1 "phase" "play" "sel" ""
+  "raw" 0 "cooked" 0 "bun" 0 "let" 0 "tom" 0 "che" 0 "asm" 0
+  "prep" 0 "served" 0 "cleans" 0 "mis" 0
+  "wraw" 0 "wcooked" 0 "wbun" 0 "wlet" 0 "wtom" 0 "wche" 0
+  "p1" (toString .User.ID) "p2" $p2id
+  "t0" currentTime.Unix}}
+
+{{/* ---- build the panel for number 1 (1 is not prime and not a multiple → Clean Up) ---- */}}
+{{$menu := cmenu
+  "type" "text"
+  "custom_id" "bg-sel"
+  "placeholder" "Select every task for this number"
+  "min_values" 1
+  "max_values" 4
+  "options" (cslice
+    (sdict "label" "Get a patty"            "value" "P" "emoji" (sdict "name" "🥩"))
+    (sdict "label" "Grab a bun"             "value" "B" "emoji" (sdict "name" "🍞"))
+    (sdict "label" "Cook a patty"           "value" "C" "emoji" (sdict "name" "🔥"))
+    (sdict "label" "Grab some lettuce"      "value" "L" "emoji" (sdict "name" "🥬"))
+    (sdict "label" "Grab a tomato"          "value" "T" "emoji" (sdict "name" "🍅"))
+    (sdict "label" "Grab a slice of cheese" "value" "H" "emoji" (sdict "name" "🧀"))
+    (sdict "label" "Assemble a burger"      "value" "A" "emoji" (sdict "name" "🍔"))
+    (sdict "label" "Serve a burger"         "value" "S" "emoji" (sdict "name" "🛎️"))
+    (sdict "label" "Clean Up"               "value" "X" "emoji" (sdict "name" "🧽"))
+  )}}
+{{$ok := cbutton "label" "Confirm" "style" "success" "custom_id" "bg-ok" "emoji" (sdict "name" "✅")}}
+
+{{$txt := printf (joinStr "\n"
+  "```"
+  "  ▄▄▄  BURGER SHIFT — CLOCK IN  ▄▄▄"
+  "```"
+  "**NUMBER 1 / 100**"
+  "<@%s> — you're up. Pick every task that applies, then hit **Confirm**."
+  ""
+  "Prepared `0` · Served `0` · Clean-ups `0` · Mistakes `0`") $s.p1}}
+
+{{dbSet .Channel.ID "burger" $s}}
+{{sendMessage nil (complexMessage "content" $txt "components" (cslice $menu $ok))}}
