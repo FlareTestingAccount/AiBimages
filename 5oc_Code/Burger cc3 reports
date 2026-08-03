@@ -1,0 +1,142 @@
+{{/* =========================================================================
+     BURGER SHIFT  —  CC #3 : REPORT GRADING
+     Trigger type  : Modal submit
+     Match type    : Starts with
+     Trigger       : bg-
+     Handles       : bg-effm (Efficiency Report) · bg-wastem (Waste Report)
+     ========================================================================= */}}
+
+{{$STRICT := true}}{{/* must match CC #2 */}}
+
+{{$rec := dbGet .Channel.ID "burger"}}
+{{if not $rec}}{{ephemeralResponse}}{{sendResponse nil "That shift is closed."}}{{return}}{{end}}
+
+{{$d := $rec.Value}}
+{{$s := sdict
+  "phase" (toString (index $d "phase")) "turn" (toInt (index $d "turn"))
+  "raw" (toInt (index $d "raw")) "cooked" (toInt (index $d "cooked"))
+  "bun" (toInt (index $d "bun")) "let" (toInt (index $d "let"))
+  "tom" (toInt (index $d "tom")) "che" (toInt (index $d "che"))
+  "prep" (toInt (index $d "prep")) "served" (toInt (index $d "served"))
+  "cleans" (toInt (index $d "cleans")) "mis" (toInt (index $d "mis"))
+  "wraw" (toInt (index $d "wraw")) "wcooked" (toInt (index $d "wcooked"))
+  "wbun" (toInt (index $d "wbun")) "wlet" (toInt (index $d "wlet"))
+  "wtom" (toInt (index $d "wtom")) "wche" (toInt (index $d "wche"))
+  "p1" (toString (index $d "p1")) "p2" (toString (index $d "p2"))
+  "t0" (toInt (index $d "t0"))}}
+
+{{$me := toString .User.ID}}
+{{$cur := $s.p1}}{{if eq $s.turn 2}}{{$cur = $s.p2}}{{end}}
+{{if ne $me $cur}}{{ephemeralResponse}}{{sendResponse nil "That report belongs to your partner."}}{{return}}{{end}}
+
+{{$V := cslice}}{{range .Values}}{{$V = $V.Append (toString .)}}{{end}}
+{{if lt (len $V) 3}}{{ephemeralResponse}}{{sendResponse nil "The form came back empty — reopen it and fill every box."}}{{return}}{{end}}
+
+{{/* ===================== EFFICIENCY REPORT ===================== */}}
+{{if eq .StrippedID "effm"}}
+{{if ne $s.phase "eff"}}{{ephemeralResponse}}{{sendResponse nil "Already filed."}}{{return}}{{end}}
+
+{{$aS := toInt (index $V 0)}}{{$aP := toInt (index $V 1)}}{{$aC := toInt (index $V 2)}}
+{{$pass := and (eq $aS $s.served) (and (eq $aP $s.prep) (eq $aC $s.cleans))}}
+
+{{if not $pass}}
+  {{if $STRICT}}
+    {{dbDel .Channel.ID "burger"}}
+    {{sendMessage nil (printf (joinStr "\n"
+      "```"
+      "  ✖  G A M E   O V E R  —  B A D   P A P E R W O R K"
+      "```"
+      "<@%s> filed an inaccurate **Efficiency Report**."
+      "Filed: Served `%d` · Prepared `%d` · Cleaned `%d`"
+      "Actual: Served `%d` · Prepared `%d` · Cleaned `%d`")
+      $me $aS $aP $aC $s.served $s.prep $s.cleans)}}
+    {{return}}
+  {{else}}
+    {{$s.Set "mis" (toInt (add $s.mis 1))}}{{dbSet .Channel.ID "burger" $s}}
+    {{ephemeralResponse}}{{sendResponse nil "❌ Those numbers don't match the till. Mistake logged — reopen the form and try again."}}
+    {{return}}
+  {{end}}
+{{end}}
+
+{{$s.Set "phase" "waste"}}{{$s.Set "turn" (toInt (sub 3 $s.turn))}}
+{{$other := $s.p1}}{{if eq $s.turn 2}}{{$other = $s.p2}}{{end}}
+{{dbSet .Channel.ID "burger" $s}}
+
+{{sendMessage nil (complexMessage "content" (printf (joinStr "\n"
+  "📋 **EFFICIENCY REPORT** — filed by <@%s> ✅"
+  "```"
+  "Burgers Served         : %d"
+  "Burgers Prepared       : %d"
+  "Amount of Times Cleaned: %d"
+  "```"
+  "<@%s> — the **Waste Report** is yours.")
+  $me $s.served $s.prep $s.cleans $other)
+  "components" (cslice
+    (cbutton "label" "Waste Report" "style" "primary" "custom_id" "bg-waste" "emoji" (sdict "name" "🗑️"))))}}
+{{return}}
+{{end}}
+
+{{/* ===================== WASTE REPORT ===================== */}}
+{{if eq .StrippedID "wastem"}}
+{{if ne $s.phase "waste"}}{{ephemeralResponse}}{{sendResponse nil "The Efficiency Report has to land first."}}{{return}}{{end}}
+
+{{/* truth = leftovers on the counter + anything scrapped during a failed serve */}}
+{{$tCooked := add $s.cooked $s.wcooked}}
+{{$tRaw    := add $s.raw    $s.wraw}}
+{{$tBun    := add $s.bun    $s.wbun}}
+{{$tLet    := add $s.let    $s.wlet}}
+{{$tTom    := add $s.tom    $s.wtom}}
+{{$tChe    := add $s.che    $s.wche}}
+
+{{$pair := split (reReplace "\\s" (index $V 4) "") ","}}
+{{if ne (len $pair) 2}}{{ephemeralResponse}}{{sendResponse nil "The last box needs two numbers separated by a comma, like `4,2`."}}{{return}}{{end}}
+
+{{$aCooked := toInt (index $V 0)}}{{$aRaw := toInt (index $V 1)}}{{$aBun := toInt (index $V 2)}}
+{{$aLet := toInt (index $V 3)}}{{$aTom := toInt (index $pair 0)}}{{$aChe := toInt (index $pair 1)}}
+
+{{$pass := and
+  (and (eq $aCooked $tCooked) (eq $aRaw $tRaw))
+  (and (and (eq $aBun $tBun) (eq $aLet $tLet)) (and (eq $aTom $tTom) (eq $aChe $tChe)))}}
+
+{{if not $pass}}
+  {{if $STRICT}}
+    {{dbDel .Channel.ID "burger"}}
+    {{sendMessage nil (printf (joinStr "\n"
+      "```"
+      "  ✖  G A M E   O V E R  —  B A D   P A P E R W O R K"
+      "```"
+      "<@%s> filed an inaccurate **Waste Report**."
+      "Actual — cooked `%d` · raw `%d` · buns `%d` · lettuce `%d` · tomatoes `%d` · cheese `%d`")
+      $me $tCooked $tRaw $tBun $tLet $tTom $tChe)}}
+    {{return}}
+  {{else}}
+    {{$s.Set "mis" (toInt (add $s.mis 1))}}{{dbSet .Channel.ID "burger" $s}}
+    {{ephemeralResponse}}{{sendResponse nil "❌ The bin doesn't agree. Mistake logged — reopen the form and try again."}}
+    {{return}}
+  {{end}}
+{{end}}
+
+{{$elapsed := sub currentTime.Unix $s.t0}}
+{{dbDel .Channel.ID "burger"}}
+
+{{$banner := "  ★  G A M E   C L E A R  —  1 0 0 %  E F F I C I E N C Y  ★"}}
+{{if gt $s.mis 0}}{{$banner = "  ✔  S H I F T   C O M P L E T E  (not a clean run)"}}{{end}}
+
+{{sendMessage nil (printf (joinStr "\n"
+  "🗑️ **WASTE REPORT** — filed by <@%s> ✅"
+  "```"
+  "Cooked Patties Wasted : %d"
+  "Raw Patties Wasted    : %d"
+  "Buns Wasted           : %d"
+  "Lettuce Wasted        : %d"
+  "Tomatoes Wasted       : %d"
+  "Cheese Slices Wasted  : %d"
+  "```"
+  "```"
+  "%s"
+  "```"
+  "<@%s> & <@%s> — shift time `%s` · mistakes `%d`"
+  "Clock out. 🍔")
+  $me $tCooked $tRaw $tBun $tLet $tTom $tChe $banner $s.p1 $s.p2 (humanizeDurationSeconds $elapsed) $s.mis)}}
+{{return}}
+{{end}}
