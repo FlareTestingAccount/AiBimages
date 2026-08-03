@@ -1,0 +1,130 @@
+{{/* BURGER SHIFT CC#2 GAMEPLAY | Trigger: Component | Starts with | bg- */}}
+{{$ST := true}}{{/* true = one mistake ends the shift. false = tally only. */}}
+
+{{$r := dbGet .Channel.ID "burger"}}
+{{if not $r}}{{ephemeralResponse}}{{sendResponse nil "That shift is closed. `-burger start @partner`"}}{{return}}{{end}}
+{{$d := $r.Value}}
+{{$s := sdict}}
+{{range cslice "n" "turn" "raw" "cooked" "bun" "let" "tom" "che" "asm" "prep" "served" "cleans" "mis" "wcooked" "wbun" "wraw" "wlet" "wtom" "wche" "t0"}}{{$s.Set . (toInt (index $d .))}}{{end}}
+{{range cslice "phase" "sel" "p1" "p2"}}{{$s.Set . (toString (index $d .))}}{{end}}
+
+{{$me := toString .User.ID}}
+{{$cur := $s.p1}}{{if eq $s.turn 2}}{{$cur = $s.p2}}{{end}}
+{{if and (ne $me $s.p1) (ne $me $s.p2)}}{{ephemeralResponse}}{{sendResponse nil "You're not on this shift. 🚪"}}{{return}}{{end}}
+{{if ne $me $cur}}{{ephemeralResponse}}{{sendResponse nil (printf "Not your turn — <@%s> is up." $cur)}}{{return}}{{end}}
+
+{{$N := sdict "P" "Get a patty" "B" "Grab a bun" "C" "Cook a patty" "L" "Grab some lettuce" "T" "Grab a tomato" "H" "Grab a slice of cheese" "A" "Assemble a burger" "S" "Serve a burger" "X" "Clean Up"}}
+{{$act := .StrippedID}}
+
+{{/* ---- MENU ---- */}}
+{{if eq $act "sel"}}
+{{if ne $s.phase "play"}}{{ephemeralResponse}}{{sendResponse nil "Counting is done — file your report."}}{{return}}{{end}}
+{{$p := cslice}}{{range .Values}}{{$p = $p.Append (toString .)}}{{end}}
+{{if eq (len $p) 0}}{{ephemeralResponse}}{{sendResponse nil "Nothing selected."}}{{return}}{{end}}
+{{$s.Set "sel" (joinStr "," $p)}}{{dbSet .Channel.ID "burger" $s}}
+{{$o := cslice}}{{range $p}}{{$o = $o.Append (index $N .)}}{{end}}
+{{ephemeralResponse}}{{sendResponse nil (printf "Loaded for **%d**: %s\nPress **Confirm** to lock it in." $s.n (joinStr ", " $o))}}
+{{return}}
+{{end}}
+
+{{/* ---- REPORT FORMS ---- */}}
+{{if eq $act "eff"}}
+{{if ne $s.phase "eff"}}{{ephemeralResponse}}{{sendResponse nil "Not due yet."}}{{return}}{{end}}
+{{sendModal (sdict "title" "Efficiency Report" "custom_id" "bg-effm" "fields" (cslice
+  (sdict "label" "Burgers Served" "placeholder" "0" "required" true "max_length" 3)
+  (sdict "label" "Burgers Prepared" "placeholder" "0" "required" true "max_length" 3)
+  (sdict "label" "Amount of Times Cleaned" "placeholder" "0" "required" true "max_length" 3)))}}
+{{return}}
+{{end}}
+
+{{if eq $act "waste"}}
+{{if ne $s.phase "waste"}}{{ephemeralResponse}}{{sendResponse nil "Efficiency Report first."}}{{return}}{{end}}
+{{sendModal (sdict "title" "Waste Report" "custom_id" "bg-wastem" "fields" (cslice
+  (sdict "label" "Cooked Patties Wasted" "placeholder" "0" "required" true "max_length" 3)
+  (sdict "label" "Raw Patties Wasted" "placeholder" "0" "required" true "max_length" 3)
+  (sdict "label" "Buns Wasted" "placeholder" "0" "required" true "max_length" 3)
+  (sdict "label" "Lettuce Wasted" "placeholder" "0" "required" true "max_length" 3)
+  (sdict "label" "Tomatoes, Cheese Slices (e.g. 4,2)" "placeholder" "0,0" "required" true "max_length" 9)))}}
+{{return}}
+{{end}}
+
+{{/* ---- CONFIRM ---- */}}
+{{if ne $act "ok"}}{{return}}{{end}}
+{{if ne $s.phase "play"}}{{ephemeralResponse}}{{sendResponse nil "Counting is done — file your report."}}{{return}}{{end}}
+{{if eq $s.sel ""}}{{ephemeralResponse}}{{sendResponse nil "Pick your task(s) from the menu first."}}{{return}}{{end}}
+
+{{$n := $s.n}}{{$sel := split $s.sel ","}}
+{{$tk := cslice}}
+{{$pr := ge $n 2}}
+{{if $pr}}{{range seq 2 $n}}{{if and (le (toInt (mult . .)) $n) (eq (toInt (mod $n .)) 0)}}{{$pr = false}}{{end}}{{end}}{{end}}
+{{if $pr}}{{$tk = $tk.Append "P"}}{{end}}
+{{if eq (toInt (mod $n 6)) 0}}{{$tk = $tk.Append "B"}}{{end}}
+{{if eq (toInt (mod $n 8)) 0}}{{$tk = $tk.Append "C"}}{{end}}
+{{if eq (toInt (mod $n 9)) 0}}{{$tk = $tk.Append "L"}}{{end}}
+{{if eq (toInt (mod $n 10)) 0}}{{$tk = $tk.Append "T"}}{{end}}
+{{if eq (toInt (mod $n 12)) 0}}{{$tk = $tk.Append "H"}}{{end}}
+{{if eq (toInt (mod $n 15)) 0}}{{$tk = $tk.Append "A"}}{{end}}
+{{if eq (toInt (mod $n 25)) 0}}{{$tk = $tk.Append "S"}}{{end}}
+{{if eq (len $tk) 0}}{{$tk = $tk.Append "X"}}{{end}}
+
+{{$good := eq (len $sel) (len $tk)}}
+{{if $good}}{{range $tk}}{{if not (in $sel .)}}{{$good = false}}{{end}}{{end}}{{end}}
+{{$rt := cslice}}{{range $tk}}{{$rt = $rt.Append (index $N .)}}{{end}}
+{{$ans := joinStr ", " $rt}}
+
+{{if not $good}}
+{{$s.Set "mis" (toInt (add $s.mis 1))}}
+{{if $ST}}
+{{dbDel .Channel.ID "burger"}}
+{{updateMessage (complexMessage "content" (printf "**✖ GAME OVER — YOU'RE FIRED**\n<@%s> called **%d** wrong.\nCorrect: **%s**\n\nReached `%d` · Prepared `%d` · Served `%d` · Clean-ups `%d`\n`-burger start @partner` to clock in again." $me $n $ans $n $s.prep $s.served $s.cleans) "components" (cslice))}}
+{{else}}
+{{$s.Set "sel" ""}}{{dbSet .Channel.ID "burger" $s}}
+{{ephemeralResponse}}{{sendResponse nil (printf "❌ Wrong for **%d**. Mistake #%d — 100%% clear is gone. Try again." $n $s.mis)}}
+{{end}}
+{{return}}
+{{end}}
+
+{{/* ---- run the station ---- */}}
+{{if in $tk "P"}}{{$s.Set "raw" (toInt (add $s.raw 1))}}{{end}}
+{{if in $tk "B"}}{{$s.Set "bun" (toInt (add $s.bun 1))}}{{end}}
+{{if in $tk "C"}}{{if ge $s.raw 1}}{{$s.Set "raw" (toInt (sub $s.raw 1))}}{{$s.Set "cooked" (toInt (add $s.cooked 1))}}{{end}}{{end}}
+{{if in $tk "L"}}{{$s.Set "let" (toInt (add $s.let 1))}}{{end}}
+{{if in $tk "T"}}{{$s.Set "tom" (toInt (add $s.tom 1))}}{{end}}
+{{if in $tk "H"}}{{$s.Set "che" (toInt (add $s.che 1))}}{{end}}
+{{if in $tk "A"}}{{if and (ge $s.cooked 1) (ge $s.bun 1)}}
+{{$s.Set "cooked" (toInt (sub $s.cooked 1))}}{{$s.Set "bun" (toInt (sub $s.bun 1))}}
+{{if ge $s.let 1}}{{$s.Set "let" (toInt (sub $s.let 1))}}{{end}}
+{{if ge $s.tom 1}}{{$s.Set "tom" (toInt (sub $s.tom 1))}}{{end}}
+{{if ge $s.che 1}}{{$s.Set "che" (toInt (sub $s.che 1))}}{{end}}
+{{$s.Set "asm" (toInt (add $s.asm 1))}}{{$s.Set "prep" (toInt (add $s.prep 1))}}
+{{end}}{{end}}
+{{if in $tk "S"}}{{if ge $s.asm 1}}{{$s.Set "asm" (toInt (sub $s.asm 1))}}{{$s.Set "served" (toInt (add $s.served 1))}}
+{{else}}{{/* not ready when served → attempt scrapped */}}
+{{if ge $s.cooked 1}}{{$s.Set "cooked" (toInt (sub $s.cooked 1))}}{{$s.Set "wcooked" (toInt (add $s.wcooked 1))}}{{end}}
+{{if ge $s.bun 1}}{{$s.Set "bun" (toInt (sub $s.bun 1))}}{{$s.Set "wbun" (toInt (add $s.wbun 1))}}{{end}}
+{{end}}{{end}}
+{{if in $tk "X"}}{{$s.Set "cleans" (toInt (add $s.cleans 1))}}{{end}}
+
+{{$s.Set "sel" ""}}{{$s.Set "turn" (toInt (sub 3 $s.turn))}}
+{{$nx := $s.p1}}{{if eq $s.turn 2}}{{$nx = $s.p2}}{{end}}
+
+{{if ge $n 100}}
+{{$s.Set "phase" "eff"}}{{dbSet .Channel.ID "burger" $s}}
+{{updateMessage (complexMessage "content" (printf "**▓ 100 — END OF SHIFT ▓**\nThe count is done. Now file your paperwork.\n\n<@%s> — open the **Efficiency Report** and fill it in from memory.\nThen <@%s> files the **Waste Report**." $nx $cur) "components" (cslice
+  (cbutton "label" "Efficiency Report" "style" "primary" "custom_id" "bg-eff" "emoji" (sdict "name" "📋"))))}}
+{{return}}
+{{end}}
+
+{{$s.Set "n" (toInt (add $n 1))}}{{dbSet .Channel.ID "burger" $s}}
+{{$mn := cmenu "type" "text" "custom_id" "bg-sel" "placeholder" (printf "Tasks for %d" $s.n) "min_values" 1 "max_values" 4 "options" (cslice
+  (sdict "label" "Get a patty" "value" "P" "emoji" (sdict "name" "🥩"))
+  (sdict "label" "Grab a bun" "value" "B" "emoji" (sdict "name" "🍞"))
+  (sdict "label" "Cook a patty" "value" "C" "emoji" (sdict "name" "🔥"))
+  (sdict "label" "Grab some lettuce" "value" "L" "emoji" (sdict "name" "🥬"))
+  (sdict "label" "Grab a tomato" "value" "T" "emoji" (sdict "name" "🍅"))
+  (sdict "label" "Grab a slice of cheese" "value" "H" "emoji" (sdict "name" "🧀"))
+  (sdict "label" "Assemble a burger" "value" "A" "emoji" (sdict "name" "🍔"))
+  (sdict "label" "Serve a burger" "value" "S" "emoji" (sdict "name" "🛎️"))
+  (sdict "label" "Clean Up" "value" "X" "emoji" (sdict "name" "🧽")))}}
+{{updateMessage (complexMessage "content" (printf "✅ **%d** — %s\n\n**NUMBER %d / 100**\n<@%s> — your call. Select every task, then **Confirm**.\n\nPrepared `%d` · Served `%d` · Clean-ups `%d` · Mistakes `%d`" $n $ans $s.n $nx $s.prep $s.served $s.cleans $s.mis) "components" (cslice $mn
+  (cbutton "label" "Confirm" "style" "success" "custom_id" "bg-ok" "emoji" (sdict "name" "✅"))))}}
