@@ -1,0 +1,39 @@
+{{/* ═══ HEARTS OF GLASS · C · BEGIN ═══ */}}
+{{if not (hasPermissions .Permissions.ManageServer)}}{{return}}{{end}}
+
+{{$TIMER    := 120}}
+{{$RESOLVE  := 7}}{{/* ← CC D's ID goes here */}}
+
+{{$st := dbGet 0 "hogstate"}}
+{{if not $st}}{{sendMessage nil "No game open. Run `-HoGStart` first."}}{{return}}{{end}}
+{{if ne (toString $st.Value.phase) "lobby"}}
+  {{sendMessage nil "Enrollment is not open."}}{{return}}
+{{end}}
+
+{{$N := dbCount "hogvote"}}
+{{if lt $N 2}}{{sendMessage nil "Not enough players entered."}}{{return}}{{end}}
+
+{{$need := toInt (roundCeil (mult (toFloat $N) 0.1))}}
+{{if lt $need 1}}{{$need = 1}}{{end}}
+{{$deadline := add (toInt currentTime.Unix) $TIMER}}
+
+{{dbSet 0 "hogstate" (sdict
+    "phase" "choice" "ch" (toString .Channel.ID) "deadline" $deadline "n" $N)}}
+
+{{sendMessage nil (complexMessage
+  "embed" (cembed
+    "title" "[Game Start]"
+    "color" 2895667
+    "description" (printf (joinStr "\n"
+      "**%d** cubes are sealed."
+      ""
+      "Rule 4 threshold: **%d** Player(s) must choose ☠ for every other cube to break."
+      ""
+      "Timer ends <t:%d:R>. Press nothing and you die where you stand.")
+      $N $need $deadline)
+    "footer" (sdict "text" "Your choice is private. You may change it until the timer ends."))
+  "buttons" (cslice
+    (cbutton "label" "☠" "custom_id" "hog-skull" "style" "danger")
+    (cbutton "label" "¥" "custom_id" "hog-yen" "style" "primary")))}}
+
+{{scheduleUniqueCC $RESOLVE nil $TIMER "hog" "auto"}}

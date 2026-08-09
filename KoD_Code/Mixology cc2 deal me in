@@ -1,0 +1,33 @@
+{{$LIMIT := 5400}}{{/* seconds on the clock — 5400 = 90 minutes */}}
+{{$DOOM := 35}}{{/* CC number of the time's-up announcer, or 0 to disable */}}
+{{$UNITS := 6}}{{/* pours per bottle */}}
+
+{{ephemeralResponse}}
+{{$uid := .User.ID}}
+{{$B := cslice "E" "R" "F" "Y" "A" "Z" "L" "X"}}
+
+{{$pool := $B}}{{$map := ""}}
+{{range $i := seq 0 8}}
+{{$k := randInt (len $pool)}}
+{{$map = print $map (index $pool $k)}}
+{{$np := cslice}}{{range $j, $v := $pool}}{{if ne $j $k}}{{$np = $np.Append $v}}{{end}}{{end}}
+{{$pool = $np}}
+{{end}}
+
+{{$stockS := print $UNITS}}{{range seq 0 7}}{{$stockS = print $stockS "," $UNITS}}{{end}}
+{{$dl := add currentTime.Unix $LIMIT}}
+
+{{dbSet $uid "kod" (sdict "map" $map "dl" $dl "dose" 0 "course" 1 "state" "playing" "stock" $stockS)}}
+
+{{if $DOOM}}
+{{cancelScheduledUniqueCC $DOOM (print "kodoom" $uid)}}
+{{scheduleUniqueCC $DOOM nil $LIMIT (print "kodoom" $uid) (toString $uid)}}
+{{end}}
+
+{{sendMessage nil (print "♦️ **" .User.Username "** sat down at the bar.")}}
+# ♦️ Your hand is dealt.
+Eight bottles — **E R F Y A Z L X** — with **{{$UNITS}}** pours each. Your shuffle is yours alone.
+
+⏱️ The room stops spinning <t:{{$dl}}:R> (at <t:{{$dl}}:t>).
+
+Read **📜 The Note**. Then start mixing. Clicking **Deal me in** again reshuffles everything and restarts your clock.

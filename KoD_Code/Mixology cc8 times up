@@ -1,0 +1,10 @@
+{{$uid := toInt64 .ExecData}}
+{{$e := dbGet $uid "kod"}}
+{{if $e}}
+{{$g := $e.Value}}
+{{if eq (toString (index $g "state")) "playing"}}
+{{$dl := toInt (index $g "dl")}}
+{{if ge currentTime.Unix $dl}}
+{{dbSet $uid "kod" (sdict "map" (toString (index $g "map")) "dl" $dl "dose" (toInt (index $g "dose")) "course" (toInt (index $g "course")) "state" "expired" "stock" (toString (index $g "stock")))}}
+{{sendMessage nil (print "⏱️💀 The room stopped spinning for <@" $uid ">. The poison finished its work.")}}
+{{end}}{{end}}{{end}}

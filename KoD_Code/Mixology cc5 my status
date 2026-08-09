@@ -1,0 +1,18 @@
+{{ephemeralResponse}}
+{{$uid := .User.ID}}
+{{$e := dbGet $uid "kod"}}
+{{if not $e}}♦️ You're not in the game yet — hit **Deal me in**.{{return}}{{end}}
+{{$g := $e.Value}}
+{{$s := toString (index $g "state")}}
+{{$B := cslice "E" "R" "F" "Y" "A" "Z" "L" "X"}}
+{{$stk := split (toString (index $g "stock")) ","}}
+🧾 **YOUR BAR**
+{{range $j, $c := $B}}{{if $j}} · {{end}}`{{$c}}` {{index $stk $j}}{{end}}
+
+{{if eq $s "won"}}✅ **Cured.** Nothing left to do but watch.
+{{else if eq $s "dead"}}💀 **Dead.** The course ran out.
+{{else if eq $s "expired"}}⏱️💀 **Dead.** Time ran out.
+{{else}}**Antidote:** dose {{toInt (index $g "dose")}} of 4 held down.
+**Course {{toInt (index $g "course")}} of 3.**
+⏱️ Room stops spinning <t:{{toInt (index $g "dl")}}:R>.
+{{end}}

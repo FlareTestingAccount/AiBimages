@@ -1,0 +1,86 @@
+{{ephemeralResponse}}
+{{$uid := .User.ID}}
+{{$e := dbGet $uid "kod"}}
+{{if not $e}}♦️ You're not in the game yet — hit **Deal me in** first.{{return}}{{end}}
+{{$g := $e.Value}}
+{{$s := toString (index $g "state")}}
+{{if eq $s "won"}}✅ You're cured. Put the glass down.{{return}}{{end}}
+{{if ne $s "playing"}}💀 You're dead. **Deal me in** to sit down again.{{return}}{{end}}
+
+{{$dl := toInt (index $g "dl")}}
+{{$map := toString (index $g "map")}}
+{{$stockS := toString (index $g "stock")}}
+{{$dose := toInt (index $g "dose")}}
+{{$course := toInt (index $g "course")}}
+
+{{if gt currentTime.Unix $dl}}
+{{dbSet $uid "kod" (sdict "map" $map "dl" $dl "dose" $dose "course" $course "state" "expired" "stock" $stockS)}}
+{{sendMessage nil (print "⏱️💀 The room stopped spinning for **" .User.Username "**. The poison finished its work.")}}
+⏱️ **Time ran out.** The last thing you taste is the drink you never poured.{{return}}
+{{end}}
+
+{{$B := cslice "E" "R" "F" "Y" "A" "Z" "L" "X"}}
+{{$D := cslice (cslice 0 0 1 1) (cslice 1 1 0 0) (cslice 0 1 0 1) (cslice 1 0 1 0) (cslice 0 1 1 0) (cslice 1 0 0 1) (cslice 1 1 1 1) (cslice 0 0 0 0)}}
+{{$ml := split $map ""}}
+{{$codes := .Values}}
+{{$n := len $codes}}
+{{$stk := split $stockS ","}}
+
+{{$short := cslice}}
+{{range $c := $codes}}
+{{$pos := 0}}{{range $j, $bl := $B}}{{if eq $bl $c}}{{$pos = $j}}{{end}}{{end}}
+{{if le (toInt (index $stk $pos)) 0}}{{$short = $short.Append $c}}{{end}}
+{{end}}
+{{if gt (len $short) 0}}🚫 **Empty** — nothing left in {{joinStr ", " $short}}.{{return}}{{end}}
+
+{{$ns := ""}}
+{{range $j, $bl := $B}}
+{{$v := toInt (index $stk $j)}}{{if in $codes $bl}}{{$v = sub $v 1}}{{end}}
+{{if $j}}{{$ns = print $ns ","}}{{end}}{{$ns = print $ns $v}}
+{{end}}
+{{dbSet $uid "kod" (sdict "map" $map "dl" $dl "dose" $dose "course" $course "state" "playing" "stock" $ns)}}
+{{$stk2 := split $ns ","}}
+
+{{$s0 := 0}}{{$s1 := 0}}{{$s2 := 0}}{{$s3 := 0}}
+{{range $c := $codes}}
+{{$di := 0}}{{range $d, $bl := $ml}}{{if eq $bl $c}}{{$di = $d}}{{end}}{{end}}
+{{$p := index $D $di}}
+{{$s0 = add $s0 (index $p 0)}}{{$s1 = add $s1 (index $p 1)}}{{$s2 = add $s2 (index $p 2)}}{{$s3 = add $s3 (index $p 3)}}
+{{end}}
+
+{{$S := cslice}}
+{{range $sv := (cslice $s0 $s1 $s2 $s3)}}{{$d := sub (mult 2 $sv) $n}}{{if gt $d 0}}{{$S = $S.Append "hi"}}{{else if lt $d 0}}{{$S = $S.Append "lo"}}{{else}}{{$S = $S.Append "mid"}}{{end}}{{end}}
+{{$b := index $S 0}}{{$h := index $S 1}}{{$g2 := index $S 2}}{{$f := index $S 3}}
+{{$pair := eq $n 2}}
+
+{{$anom := ""}}{{$ad := ""}}
+{{if $pair}}{{if and (ne $b "mid") (ne $h "mid")}}{{$anom = "STATIC ARC"}}{{$ad = "A blue arc jumps between the glasses. The lights flicker."}}{{else if and (eq $b "mid") (eq $h "mid")}}{{if eq $f "hi"}}{{$anom = "SHATTER"}}{{$ad = "Violent resonance. The glass shatters."}}{{else if eq $f "lo"}}{{$anom = "DEAD RINGER"}}{{$ad = "It goes glassy and perfectly motionless."}}{{end}}{{end}}{{end}}
+
+{{$mh := and (eq $b "mid") $pair (eq $anom "")}}
+{{$mg := and (eq $b "hi") (eq $anom "")}}
+
+{{$L := cslice}}
+{{if eq $b "hi"}}{{$L = $L.Append "Clots into a thick gel"}}{{else if and (eq $b "mid") $pair}}{{$L = $L.Append "Curdles and boils over"}}{{end}}
+{{if not $mh}}{{if eq $h "hi"}}{{$L = $L.Append "Steams"}}{{else if eq $h "lo"}}{{$L = $L.Append "Frosts the glass"}}{{end}}{{end}}
+{{if not $mg}}{{if eq $g2 "hi"}}{{$L = $L.Append "Blazes under UV"}}{{else if and (eq $g2 "mid") $pair}}{{$L = $L.Append "Goes inky black"}}{{end}}{{end}}
+{{if eq $f "hi"}}{{$L = $L.Append "Foams over"}}{{else if and (eq $f "mid") $pair}}{{$L = $L.Append "Hisses and flattens"}}{{end}}
+
+{{$sig := ""}}{{$sd := ""}}
+{{if eq $n 4}}
+{{if eq $s0 0}}{{$sig = "THE SOUR NOTE"}}{{$sd = "Goes crystal clear. A rising whistle fills the room."}}{{end}}
+{{if eq $s0 4}}{{$sig = "THE CURTAIN"}}{{$sd = "Sets into a solid opaque block. Unbreakable."}}{{end}}
+{{if eq $s1 4}}{{$sig = "SANTA ANA"}}{{$sd = "Hot wind fills the room. Flames lick the surface."}}{{end}}
+{{if eq $s1 0}}{{$sig = "THE DEEP FREEZE"}}{{$sd = "Frosts solid and welds the glass to the bar."}}{{end}}
+{{if eq $s2 4}}{{$sig = "THE SEARCHLIGHT"}}{{$sd = "A vertical beam of light punches the ceiling."}}{{end}}
+{{if eq $s2 0}}{{$sig = "THE SMOKE SKULL"}}{{$sd = "A skull of smoke rises and slowly dissipates."}}{{end}}
+{{if eq $s3 4}}{{$sig = "THE STANDING OVATION"}}{{$sd = "Erupts in a roaring column of foam."}}{{end}}
+{{if eq $s3 0}}{{$sig = "THE HUSH"}}{{$sd = "All sound in the room dampens to nothing."}}{{end}}
+{{end}}
+
+🥃 **{{joinStr " + " $codes}}**
+{{range $l := $L}}> {{$l}}
+{{end}}{{if ne $anom ""}}> ⚡ **{{$anom}}** — {{$ad}}
+{{end}}{{if ne $sig ""}}> ✦ **{{$sig}}** — {{$sd}}
+{{end}}{{if and (eq (len $L) 0) (eq $anom "") (eq $sig "")}}> *Nothing happens at all.*
+{{end}}
+{{range $i, $c := $codes}}{{$pos := 0}}{{range $j, $bl := $B}}{{if eq $bl $c}}{{$pos = $j}}{{end}}{{end}}{{if $i}} · {{end}}`{{$c}}:{{index $stk2 $pos}}`{{end}} left · ⏱️ <t:{{$dl}}:R>

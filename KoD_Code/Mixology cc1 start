@@ -1,0 +1,35 @@
+{{/* =========================================================================
+     Trigger Types
+     A(1) command "panelKoD"
+     B(2) message component "^KoD-deal$"
+     C(3) message component "^KoD-note$"
+     D(4) message component "^KoD-menu$"
+     E(5) message component "^KoD-status$"
+	 F(6) message component "^KoD-mix$"
+	 G(7) message component  "^KoD-drink$"
+	 H(8) none
+	 I(9) command "peekKoD"
+     ========================================================================= */}}
+
+{{$content := `# ♦️ KING OF DIAMONDS · MIXOLOGY
+**You have been poisoned.** Eight unmarked bottles. Four drinks, in the right order, are the cure.
+
+**♦️ Deal me in** starts your game — your bottles are shuffled differently from everyone else's, and your 90 minutes start immediately.
+**🥃 MIX** two to four bottles to observe a reaction. **💉 DRINK** to commit a dose — three failed courses and your heart stops.
+
+Everything you click here is visible only to you. Trade theories out loud; your answers won't help anyone else.`}}
+
+{{$bDeal := cbutton "label" "Deal me in" "custom_id" "KoD-deal" "style" "success" "emoji" (sdict "name" "♦️")}}
+{{$bNote := cbutton "label" "The Note" "custom_id" "KoD-note" "style" "secondary" "emoji" (sdict "name" "📜")}}
+{{$bMenu := cbutton "label" "Drink Menu" "custom_id" "KoD-menu" "style" "secondary" "emoji" (sdict "name" "🍸")}}
+{{$bStat := cbutton "label" "My Status" "custom_id" "KoD-status" "style" "primary" "emoji" (sdict "name" "🧾")}}
+
+{{$opts := cslice}}
+{{range $c := cslice "E" "R" "F" "Y" "A" "Z" "L" "X"}}
+{{$opts = $opts.Append (sdict "label" (print "Bottle " $c) "value" $c "emoji" (sdict "name" "🧪"))}}
+{{end}}
+
+{{$mMix := cmenu "type" "text" "placeholder" "🥃  MIX — pick 2 to 4 bottles" "custom_id" "KoD-mix" "options" $opts "min_values" 2 "max_values" 4}}
+{{$mDrink := cmenu "type" "text" "placeholder" "💉  DRINK — commit a dose (1 to 4 bottles)" "custom_id" "KoD-drink" "options" $opts "min_values" 1 "max_values" 4}}
+
+{{sendMessage nil (complexMessage "content" $content "buttons" (cslice $bDeal $bNote $bMenu $bStat) "menus" (cslice $mMix $mDrink))}}

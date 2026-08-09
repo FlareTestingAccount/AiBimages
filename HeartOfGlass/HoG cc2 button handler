@@ -1,0 +1,26 @@
+{{/* ═══ HEARTS OF GLASS · B · BUTTONS ═══ */}}
+{{ephemeralResponse}}
+{{$c := .StrippedID}}
+{{$st := dbGet 0 "hogstate"}}
+{{if not $st}}There is no game running.{{return}}{{end}}
+{{$s := $st.Value}}
+{{$phase := toString $s.phase}}
+
+{{if hasSuffix $c "enter"}}
+  {{if ne $phase "lobby"}}Enrollment is closed.{{return}}{{end}}
+  {{if dbGet .User.ID "hogvote"}}You are already in a cube.{{return}}{{end}}
+  {{dbSetExpire .User.ID "hogvote" 0 7200}}
+  The glass closes around you. Wait for the game to start.
+
+{{else if or (hasSuffix $c "skull") (hasSuffix $c "yen")}}
+  {{if ne $phase "choice"}}The devices are not live.{{return}}{{end}}
+  {{if not (dbGet .User.ID "hogvote")}}You are not in a cube.{{return}}{{end}}
+  {{if ge (toInt currentTime.Unix) (toInt $s.deadline)}}Too late.{{return}}{{end}}
+  {{if hasSuffix $c "skull"}}
+    {{dbSetExpire .User.ID "hogvote" 1 7200}}
+    You rest your thumb on **☠**. Nothing happens yet.
+  {{else}}
+    {{dbSetExpire .User.ID "hogvote" 2 7200}}
+    You rest your thumb on **¥**. The screen above you is still dark.
+  {{end}}
+{{end}}

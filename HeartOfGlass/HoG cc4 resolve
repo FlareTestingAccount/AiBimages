@@ -1,0 +1,94 @@
+{{/* ═══ HEARTS OF GLASS · D · RESOLVE ═══ */}}
+{{$ROLECC := 8}}{{/* ← CC E's ID goes here */}}
+
+{{$st := dbGet 0 "hogstate"}}
+{{if not $st}}{{return}}{{end}}
+{{$s := $st.Value}}
+{{if ne (toString $s.phase) "choice"}}{{return}}{{end}}
+{{dbSet 0 "hogstate" (sdict "phase" "done" "ch" $s.ch "deadline" 0 "n" $s.n)}}
+
+{{$entries := dbTopEntries "hogvote" 100 0}}
+{{$N := len $entries}}
+{{if lt $N 1}}
+  {{sendMessage nil "No one entered a cube. The game does not begin."}}
+  {{return}}
+{{end}}
+
+{{$skull := cslice}}{{$yen := cslice}}{{$silent := cslice}}
+{{range $e := $entries}}
+  {{$v := toInt $e.Value}}
+  {{if eq $v 1}}{{$skull = $skull.Append $e.UserID}}
+  {{else if eq $v 2}}{{$yen = $yen.Append $e.UserID}}
+  {{else}}{{$silent = $silent.Append $e.UserID}}{{end}}
+{{end}}
+
+{{$need := toInt (roundCeil (mult (toFloat $N) 0.1))}}
+{{if lt $need 1}}{{$need = 1}}{{end}}
+{{$met := and (gt (len $skull) 0) (ge (len $skull) $need)}}
+
+{{/* three distinct ways to die, tracked separately for role assignment */}}
+{{$lived := cslice}}{{$coindead := cslice}}
+{{if $met}}
+  {{range $u := $yen}}{{$lived = $lived.Append $u}}{{end}}
+{{else}}
+  {{range $u := $yen}}
+    {{if eq (randInt 2) 1}}{{$lived = $lived.Append $u}}
+    {{else}}{{$coindead = $coindead.Append $u}}{{end}}
+  {{end}}
+{{end}}
+{{$heads := len $lived}}
+
+{{$died := cslice}}
+{{range $u := $skull}}{{$died = $died.Append $u}}{{end}}
+{{range $u := $coindead}}{{$died = $died.Append $u}}{{end}}
+{{range $u := $silent}}{{$died = $died.Append $u}}{{end}}
+
+{{/* queue role grants — s=sacrifice  c=coin  t=timeout  v=survivor
+     IDs go in as STRINGS; stored as numbers they lose precision */}}
+{{$q := cslice}}
+{{range $u := $skull}}{{$q = $q.Append (print (toString $u) ":s")}}{{end}}
+{{range $u := $coindead}}{{$q = $q.Append (print (toString $u) ":c")}}{{end}}
+{{range $u := $silent}}{{$q = $q.Append (print (toString $u) ":t")}}{{end}}
+{{range $u := $lived}}{{$q = $q.Append (print (toString $u) ":v")}}{{end}}
+{{if gt (len $q) 0}}
+  {{dbSet 0 "hogroles" (sdict "q" $q "i" 0)}}
+  {{scheduleUniqueCC $ROLECC nil 2 "hogroles" "go"}}
+{{end}}
+
+{{$ll := ""}}{{range $i, $u := $lived}}{{if lt $i 25}}{{$ll = print $ll "<@" $u "> "}}{{end}}{{end}}
+{{if gt (len $lived) 25}}{{$ll = print $ll (printf "…+%d" (sub (len $lived) 25))}}{{end}}
+{{if eq $ll ""}}{{$ll = "—"}}{{end}}
+{{$dl := ""}}{{range $i, $u := $died}}{{if lt $i 25}}{{$dl = print $dl "<@" $u "> "}}{{end}}{{end}}
+{{if gt (len $died) 25}}{{$dl = print $dl (printf "…+%d" (sub (len $died) 25))}}{{end}}
+{{if eq $dl ""}}{{$dl = "—"}}{{end}}
+
+{{$col := 10038562}}
+{{$verdict := ""}}
+{{if $met}}
+  {{$col = 5025616}}
+  {{$verdict = printf (joinStr "\n"
+    "**%d** of you reached for the skull. The threshold was **%d**."
+    ""
+    "Every remaining cube shatters at once. No coin was ever flipped."
+    "The ones who pressed ☠ do not walk out.")
+    (len $skull) $need}}
+{{else}}
+  {{$verdict = printf (joinStr "\n"
+    "**%d** reached for the skull. The threshold was **%d**. Not enough."
+    ""
+    "The screens light up. **%d** coins spin."
+    "**%d** landed 表 omote. **%d** landed 裏 ura.")
+    (len $skull) $need (len $yen) $heads (sub (len $yen) $heads)}}
+{{end}}
+
+{{sendMessage nil (cembed
+  "title" "HEARTS OF GLASS — RESULT"
+  "color" $col
+  "description" $verdict
+  "fields" (cslice
+    (sdict "name" (printf "Survived (%d)" (len $lived)) "value" $ll)
+    (sdict "name" (printf "Died (%d)" (len $died)) "value" $dl)
+    (sdict "name" "Cause of death" "value" (printf "Sacrifice ☠ %d · Coin 裏 %d · Timeout %d"
+        (len $skull) (len $coindead) (len $silent)))))}}
+
+{{dbDelMultiple (sdict "pattern" "hogvote") 100 0}}

@@ -1,0 +1,20 @@
+{{/* ══════════ ACE OF SPADES · 3 of 3 · DEATH ══════════ */}}
+{{if .ExecData}}
+  {{$uid := toInt64 .ExecData.uid}}
+  {{$e := dbGet $uid "aos_run"}}
+  {{if $e}}
+    {{/* only kill the run this timer was launched for */}}
+    {{if eq (toInt $e.Value.start) (toInt .ExecData.start)}}
+      {{$idx := toInt $e.Value.idx}}
+      {{dbDel $uid "aos_run"}}
+      {{sendMessage nil (cembed
+        "title" "☠  GAME OVER"
+        "color" 10038562
+        "description" (printf (joinStr "\n"
+            "Five minutes."
+            ""
+            "<@%d> got as far as prompt **%d / 15** before the room went still.")
+            $uid (add $idx 1)))}}
+    {{end}}
+  {{end}}
+{{end}}

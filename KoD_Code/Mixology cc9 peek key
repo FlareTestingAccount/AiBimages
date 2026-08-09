@@ -1,0 +1,15 @@
+{{$args := parseArgs 1 "Usage: -peekKoD @player" (carg "user" "player")}}
+{{$t := $args.Get 0}}
+{{$e := dbGet $t.ID "kod"}}
+{{if not $e}}No game running for that player.{{return}}{{end}}
+{{$g := $e.Value}}
+{{$mapS := toString (index $g "map")}}
+{{$ml := split $mapS ""}}
+{{$DN := cslice "The Red Carpet" "Velvet Rope" "Laurel Canyon Smoke" "Mulholland Moonlight" "The Flashbulb" "The Blackout" "Neon Sunrise" "Last Call"}}
+♦️ **{{$t.Username}}** — key `{{$mapS}}`
+{{range $d, $bl := $ml}}`{{$bl}}` = {{index $DN $d}}
+{{end}}
+**Antidote:** `{{index $ml 4}}{{index $ml 3}}` → `{{index $ml 6}}` → `{{index $ml 1}}{{index $ml 2}}{{index $ml 5}}{{index $ml 7}}` → `{{index $ml 1}}{{index $ml 3}}{{index $ml 4}}{{index $ml 7}}`
+⏱️ Deadline <t:{{toInt (index $g "dl")}}:R>
+State: {{toString (index $g "state")}} · dose {{toInt (index $g "dose")}}/4 · course {{toInt (index $g "course")}}/3
+Stock (E R F Y A Z L X): `{{toString (index $g "stock")}}`

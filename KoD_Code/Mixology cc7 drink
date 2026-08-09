@@ -1,0 +1,65 @@
+{{$DOOM := 35}}{{/* CC number of the time's-up announcer, or 0 */}}
+
+{{ephemeralResponse}}
+{{$uid := .User.ID}}
+{{$e := dbGet $uid "kod"}}
+{{if not $e}}♦️ You're not in the game yet — hit **Deal me in** first.{{return}}{{end}}
+{{$g := $e.Value}}
+{{$s := toString (index $g "state")}}
+{{if eq $s "won"}}✅ You're already cured. Put the glass down.{{return}}{{end}}
+{{if ne $s "playing"}}💀 You're dead. **Deal me in** to sit down again.{{return}}{{end}}
+
+{{$dl := toInt (index $g "dl")}}
+{{$map := toString (index $g "map")}}
+{{$stockS := toString (index $g "stock")}}
+
+{{if gt currentTime.Unix $dl}}
+{{dbSet $uid "kod" (sdict "map" $map "dl" $dl "dose" (toInt (index $g "dose")) "course" (toInt (index $g "course")) "state" "expired" "stock" $stockS)}}
+{{sendMessage nil (print "⏱️💀 The room stopped spinning for **" .User.Username "**. The poison finished its work.")}}
+⏱️ **Time ran out.**{{return}}
+{{end}}
+
+{{$ml := split $map ""}}
+{{$codes := .Values}}
+
+{{$REQ := cslice (cslice (index $ml 4) (index $ml 3)) (cslice (index $ml 6)) (cslice (index $ml 1) (index $ml 2) (index $ml 5) (index $ml 7)) (cslice (index $ml 1) (index $ml 3) (index $ml 4) (index $ml 7))}}
+{{$dose := toInt (index $g "dose")}}
+{{$course := toInt (index $g "course")}}
+{{$need := index $REQ $dose}}
+{{$ok := eq (len $codes) (len $need)}}
+{{if $ok}}{{range $c := $need}}{{if not (in $codes $c)}}{{$ok = false}}{{end}}{{end}}{{end}}
+
+{{if $ok}}
+{{$dose = add $dose 1}}
+{{if eq $dose 4}}
+{{dbSet $uid "kod" (sdict "map" $map "dl" $dl "dose" $dose "course" $course "state" "won" "stock" $stockS)}}
+{{if $DOOM}}{{cancelScheduledUniqueCC $DOOM (print "kodoom" $uid)}}{{end}}
+{{sendMessage nil (print "🏆 **THE HUSH TAKES THE ROOM.** **" .User.Username "** is cured — course " $course " of 3, with time to spare.")}}
+# 🏆 Cured.
+Every sound drops out — the ice, the traffic, the blood in your ears. When it comes back, the poison is gone.
+
+The diamond card on the bar is gone too.
+{{else}}
+{{dbSet $uid "kod" (sdict "map" $map "dl" $dl "dose" $dose "course" $course "state" "playing" "stock" $stockS)}}
+{{$flav := cslice "The tremor in your hands stops. Something in this is working." "Your vision clears at the edges. Two down." "The taste of copper leaves your mouth. One more."}}
+🩸 **Dose {{$dose}} of 4 holds down.**
+> *{{index $flav (sub $dose 1)}}*
+Course {{$course}} of 3 still alive. ⏱️ <t:{{$dl}}:R>
+{{end}}
+{{else}}
+{{$course = add $course 1}}
+{{if gt $course 3}}
+{{dbSet $uid "kod" (sdict "map" $map "dl" $dl "dose" 0 "course" $course "state" "dead" "stock" $stockS)}}
+{{if $DOOM}}{{cancelScheduledUniqueCC $DOOM (print "kodoom" $uid)}}{{end}}
+{{sendMessage nil (print "💀 **" .User.Username "**'s heart stops. The glass rolls off the bar and doesn't break.")}}
+# 💀 Your heart stops.
+The fourth wrong drink was one too many.
+
+*Your order was:* `{{index $ml 4}}{{index $ml 3}}` → `{{index $ml 6}}` → `{{index $ml 1}}{{index $ml 2}}{{index $ml 5}}{{index $ml 7}}` → `{{index $ml 1}}{{index $ml 3}}{{index $ml 4}}{{index $ml 7}}`
+{{else}}
+{{dbSet $uid "kod" (sdict "map" $map "dl" $dl "dose" 0 "course" $course "state" "playing" "stock" $stockS)}}
+🤢 **WRONG.** You bring it straight back up, and the poison digs in deeper.
+> *Dose {{add (toInt (index $g "dose")) 1}} was not it. The course resets to the beginning.*
+**Course {{$course}} of 3.** {{if eq $course 3}}One left. Make it count.{{end}} ⏱️ <t:{{$dl}}:R>
+{{end}}
+{{end}}

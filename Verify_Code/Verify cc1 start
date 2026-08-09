@@ -1,0 +1,45 @@
+{{/* ══════════ ACE OF SPADES · 1 of 3 · START ══════════ */}}
+
+
+{{/* =========================================================================
+     BURGER SHIFT  —  CC #1 : CONTROLLER
+     Trigger type : Command
+     Trigger      : Start8oS
+     Other two commands are trigger type none
+     ========================================================================= */}}
+
+{{/* ───── CONFIG (must match CC #2) ───── */}}
+{{$BASE    := "https://raw.githubusercontent.com/FlareTestingAccount/AiBimages/main/aos_captchas"}}
+{{$LIMIT   := 300}}
+{{$TOTAL   := 15}}
+{{$DEATHCC := 6}}
+{{$WORDS := (cslice
+  "K7mQ4z" "Rb9Xt2" "V3npF8" "Zq5Hd7" "T2wYs6"
+  "Ge8Jkr" "N4czPv" "Wm6Bhx" "Dy9Sfq" "A5tKnu"
+  "Uj3Rgw" "Pc7Vze" "Xh2Mdb" "Fs6Nqy" "Yt4Wpk")}}
+{{/* ──────────────────────────────────── */}}
+
+{{$uid := .User.ID}}
+{{if dbGet $uid "aos_run"}}
+  {{sendMessage nil (print "<@" $uid "> — you are already in the room. Keep typing.")}}
+{{else}}
+  {{$now := toInt currentTime.Unix}}
+  {{$off := randInt (len $WORDS)}}
+  {{dbSetExpire $uid "aos_run" (sdict
+      "start" $now "idx" 0 "off" $off "pen" 0 "ch" .Channel.ID) 1800}}
+
+  {{sendMessage nil (cembed
+    "title" "☠  8 OF SPADES"
+    "color" 3394611
+    "description" (printf (joinStr "\n"
+        "The door seals behind you. Somewhere above, a valve turns."
+        ""
+        "**%d** prompts stand between you and the corridor."
+        "You have **5 minutes** before the air stops being air."
+        ""
+        "Type what you see. Exactly as you see it.") $TOTAL)
+    "image" (sdict "url" (printf "%s/w%d_b1.png" $BASE $off))
+    "footer" (sdict "text" (printf "1 / %d   ·   air: clear" $TOTAL)))}}
+
+  {{execCC $DEATHCC nil $LIMIT (sdict "uid" $uid "start" $now)}}
+{{end}}

@@ -1,0 +1,34 @@
+{{/* ═══ HEARTS OF GLASS · E · ROLES ═══ */}}
+{{$SACRIFICE := "1530254698958033057"}}{{/* pressed ☠ */}}
+{{$COIN      := "1530254509022904462"}}{{/* flipped 裏 ura */}}
+{{$TIMEOUT   := "0"}}{{/* pressed nothing — "0" disables */}}
+{{$SURVIVOR  := "0"}}{{/* walked out alive — "0" disables */}}
+{{$CHUNK     := 8}}
+
+{{$r := dbGet 0 "hogroles"}}
+{{if not $r}}{{return}}{{end}}
+{{$q := $r.Value.q}}
+{{$i := toInt $r.Value.i}}
+{{$done := 0}}
+
+{{range $j, $item := $q}}
+  {{if and (ge $j $i) (lt $done $CHUNK)}}
+    {{$parts := split (toString $item) ":"}}
+    {{$uid  := index $parts 0}}
+    {{$kind := index $parts 1}}
+    {{$role := $SACRIFICE}}
+    {{if eq $kind "c"}}{{$role = $COIN}}
+    {{else if eq $kind "t"}}{{$role = $TIMEOUT}}
+    {{else if eq $kind "v"}}{{$role = $SURVIVOR}}{{end}}
+    {{if ne $role "0"}}{{giveRoleID $uid $role}}{{end}}
+    {{$done = add $done 1}}
+  {{end}}
+{{end}}
+
+{{$next := add $i $done}}
+{{if lt $next (len $q)}}
+  {{dbSet 0 "hogroles" (sdict "q" $q "i" $next)}}
+  {{scheduleUniqueCC .CCID nil 4 "hogroles" "next"}}
+{{else}}
+  {{dbDel 0 "hogroles"}}
+{{end}}

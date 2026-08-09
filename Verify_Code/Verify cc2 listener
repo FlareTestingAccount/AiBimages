@@ -1,0 +1,69 @@
+{{/* ══════════ ACE OF SPADES · 2 of 3 · ANSWER ══════════ */}}
+
+{{/* ───── CONFIG (must match CC #1) ───── */}}
+{{$BASE    := "https://raw.githubusercontent.com/FlareTestingAccount/AiBimages/main/aos_captchas"}}
+{{$LIMIT   := 300}}
+{{$TOTAL   := 15}}
+{{$PENALTY := 12}}{{/* seconds of "extra gas" per wrong answer */}}
+{{$STRICT  := true}}{{/* false = case-insensitive */}}
+{{$WORDS := (cslice
+  "K7mQ4z" "Rb9Xt2" "V3npF8" "Zq5Hd7" "T2wYs6"
+  "Ge8Jkr" "N4czPv" "Wm6Bhx" "Dy9Sfq" "A5tKnu"
+  "Uj3Rgw" "Pc7Vze" "Xh2Mdb" "Fs6Nqy" "Yt4Wpk")}}
+{{$AIR := (cslice
+  "clear" "faintly sweet" "a chemical edge" "your eyes water" "throat closing"
+  "the walls tilt" "two of everything" "you are on one knee" "sound is going" "…")}}
+{{/* ──────────────────────────────────── */}}
+
+{{$uid := .User.ID}}
+{{$e := dbGet $uid "aos_run"}}
+{{if $e}}
+  {{$v     := $e.Value}}
+  {{$start := toInt $v.start}}
+  {{$idx   := toInt $v.idx}}
+  {{$off   := toInt $v.off}}
+  {{$pen   := toInt $v.pen}}
+
+  {{$el  := toInt (add (sub (toInt currentTime.Unix) $start) $pen)}}
+  {{$ans := index $WORDS (toInt (mod (add $off $idx) (len $WORDS)))}}
+  {{$in  := trimSpace .Message.Content}}
+  {{$ok  := eq $in $ans}}
+  {{if not $STRICT}}{{$ok = eq (lower $in) (lower $ans)}}{{end}}
+
+  {{if ge $el $LIMIT}}
+    {{dbDel $uid "aos_run"}}
+    {{sendMessage nil (cembed
+      "title" "☠  GAME OVER"
+      "color" 10038562
+      "description" (printf "<@%d> stopped moving at prompt **%d / %d**.\nThe room is quiet now." $uid (add $idx 1) $TOTAL))}}
+
+  {{else if $ok}}
+    {{$idx = add $idx 1}}
+    {{if ge $idx $TOTAL}}
+      {{dbDel $uid "aos_run"}}
+      {{sendMessage nil (cembed
+        "title" "✅  GAME CLEAR"
+        "color" 5025616
+        "description" (printf "The lock releases. <@%d> falls into the corridor, breathing.\n\n**%d** prompts · **%ds** on the clock (%d penalty)." $uid $TOTAL $el $pen))}}
+    {{else}}
+      {{$tier := toInt (add 1 (div $el 30))}}
+      {{if gt $tier 10}}{{$tier = 10}}{{end}}
+      {{$next := toInt (mod (add $off $idx) (len $WORDS))}}
+      {{dbSetExpire $uid "aos_run" (sdict
+          "start" $start "idx" $idx "off" $off "pen" $pen "ch" $v.ch) 1800}}
+      {{sendMessage nil (cembed
+        "color" 3394611
+        "description" (printf "The panel accepts it. Another lock, further down the wall.\n**%ds** of air left." (toInt (sub $LIMIT $el)))
+        "image" (sdict "url" (printf "%s/w%d_b%d.png" $BASE $next $tier))
+        "footer" (sdict "text" (printf "%d / %d   ·   air: %s"
+            (add $idx 1) $TOTAL (index $AIR (toInt (sub $tier 1))))))}}
+    {{end}}
+
+  {{else}}
+    {{$pen = add $pen $PENALTY}}
+    {{dbSetExpire $uid "aos_run" (sdict
+        "start" $start "idx" $idx "off" $off "pen" $pen "ch" $v.ch) 1800}}
+    {{sendMessage nil (print "<@" $uid "> the panel buzzes. Somewhere the valve opens wider. **−"
+        $PENALTY "s**")}}
+  {{end}}
+{{end}}
