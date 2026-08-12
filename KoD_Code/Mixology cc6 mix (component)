@@ -54,7 +54,7 @@
 {{$pair := eq $n 2}}
 
 {{$anom := ""}}{{$ad := ""}}
-{{if $pair}}{{if and (ne $b "mid") (ne $h "mid")}}{{$anom = "STATIC ARC"}}{{$ad = "A blue arc jumps between the glasses. The lights flicker."}}{{else if and (eq $b "mid") (eq $h "mid")}}{{if eq $f "hi"}}{{$anom = "SHATTER"}}{{$ad = "Violent resonance. The glass shatters."}}{{else if eq $f "lo"}}{{$anom = "DEAD RINGER"}}{{$ad = "It goes glassy and perfectly motionless."}}{{end}}{{end}}{{end}}
+{{if $pair}}{{if and (ne $b "mid") (ne $h "mid")}}{{$anom = "STATIC ARC"}}{{$ad = "A blue arc jumps between the glasses. The lights flicker."}}{{else if and (eq $b "mid") (eq $h "mid")}}{{if eq $f "hi"}}{{$anom = "SHATTER"}}{{$ad = "Violent resonance. The glass shatters."}}{{else if eq $f "lo"}}{{$anom = "DEAD RINGER"}}{{$ad = "It goes glassy and after a ding perfectly motionless"}}{{end}}{{end}}{{end}}
 
 {{$mh := and (eq $b "mid") $pair (eq $anom "")}}
 {{$mg := and (eq $b "hi") (eq $anom "")}}
