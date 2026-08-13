@@ -7,6 +7,10 @@
 {{$s := sdict}}
 {{range cslice "n" "turn" "raw" "cooked" "bun" "let" "tom" "che" "asm" "prep" "served" "cleans" "mis" "wcooked" "wbun" "wraw" "wlet" "wtom" "wche" "t0"}}{{$s.Set . (toInt (index $d .))}}{{end}}
 {{range cslice "phase" "sel" "p1" "p2"}}{{$s.Set . (toString (index $d .))}}{{end}}
+{{/* last "Loaded for" ephemeral — guards keep old shifts from erroring */}}
+{{$s.Set "tok" ""}}{{$s.Set "tokt" 0}}
+{{if index $d "tok"}}{{$s.Set "tok" (toString (index $d "tok"))}}{{end}}
+{{if index $d "tokt"}}{{$s.Set "tokt" (toInt (index $d "tokt"))}}{{end}}
 
 {{$me := toString .User.ID}}
 {{$cur := $s.p1}}{{if eq $s.turn 2}}{{$cur = $s.p2}}{{end}}
@@ -21,7 +25,10 @@
 {{if ne $s.phase "play"}}{{ephemeralResponse}}{{sendResponse nil "Counting is done — file your report."}}{{return}}{{end}}
 {{$p := cslice}}{{range .Values}}{{$p = $p.Append (toString .)}}{{end}}
 {{if eq (len $p) 0}}{{ephemeralResponse}}{{sendResponse nil "Nothing selected."}}{{return}}{{end}}
-{{$s.Set "sel" (joinStr "," $p)}}{{dbSet .Channel.ID "burger" $s}}
+{{if and (ne $s.tok "") (lt (toInt (sub currentTime.Unix $s.tokt)) 780)}}{{deleteInteractionResponse $s.tok nil 0}}{{end}}
+{{$s.Set "sel" (joinStr "," $p)}}
+{{$s.Set "tok" (toString .Interaction.Token)}}{{$s.Set "tokt" (toInt currentTime.Unix)}}
+{{dbSet .Channel.ID "burger" $s}}
 {{$o := cslice}}{{range $p}}{{$o = $o.Append (index $N .)}}{{end}}
 {{ephemeralResponse}}{{sendResponse nil (printf "Loaded for **%d**: %s\nPress **Confirm** to lock it in." $s.n (joinStr ", " $o))}}
 {{return}}
@@ -52,6 +59,8 @@
 {{if ne $act "ok"}}{{return}}{{end}}
 {{if ne $s.phase "play"}}{{ephemeralResponse}}{{sendResponse nil "Counting is done — file your report."}}{{return}}{{end}}
 {{if eq $s.sel ""}}{{ephemeralResponse}}{{sendResponse nil "Pick your task(s) from the menu first."}}{{return}}{{end}}
+{{if and (ne $s.tok "") (lt (toInt (sub currentTime.Unix $s.tokt)) 780)}}{{deleteInteractionResponse $s.tok nil 0}}{{end}}
+{{$s.Set "tok" ""}}{{$s.Set "tokt" 0}}
 
 {{$n := $s.n}}{{$sel := split $s.sel ","}}
 {{$tk := cslice}}

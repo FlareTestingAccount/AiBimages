@@ -12,24 +12,30 @@
      ========================================================================= */}}
 
 {{dbDelMultiple (sdict "pattern" "hogvote") 100 0}}
-{{dbSet 0 "hogstate" (sdict "phase" "lobby" "ch" (toString .Channel.ID) "deadline" 0 "n" 0)}}
-
-{{sendMessage nil (complexMessage
+{{$desc := joinStr "\n"
+  "**[Welcome Players]**"
+  ""
+  "**Rule 1.** Each Player must pick up the device in front of them. On this device are two buttons."
+  "☠ — fills your glass cube with smoke. You Die."
+  "¥ — flips a coin on the viewing screen. 表 omote, you Live and your cube breaks. 裏 ura, your cube fills with smoke."
+  ""
+  "**Rule 2.** You must press one button before the timer runs out."
+  "**Rule 3.** Players may speak only in one collective group."
+  "**Rule 4.** If 10% of Players choose ☠, every other cube breaks — except theirs."
+  ""
+  "Step into a cube to enroll."}}
+{{$mid := sendMessageRetID nil (complexMessage
   "embed" (cembed
     "title" "HEARTS OF GLASS"
     "color" 2895667
-    "description" (joinStr "\n"
-      "**[Welcome Players]**"
-      ""
-      "**Rule 1.** Each Player must pick up the device in front of them. On this device are two buttons."
-      "☠ — fills your glass cube with smoke. You Die."
-      "¥ — flips a coin on the viewing screen. 表 omote, you Live and your cube breaks. 裏 ura, your cube fills with smoke."
-      ""
-      "**Rule 2.** You must press one button before the timer runs out."
-      "**Rule 3.** Players may speak only in one collective group."
-      "**Rule 4.** If 10% of Players choose ☠, every other cube breaks — except theirs."
-      ""
-      "Step into a cube to enroll.")
-    "footer" (sdict "text" "Enrollment open"))
+    "description" $desc
+    "footer" (sdict "text" "Enrollment open · 0 in the glass"))
   "buttons" (cslice
     (cbutton "label" "Enter the cube" "custom_id" "hog-enter" "style" "secondary")))}}
+{{dbSet 0 "hogstate" (sdict
+  "phase" "lobby"
+  "ch" (toString .Channel.ID)
+  "deadline" 0
+  "n" 0
+  "msg" (toString $mid)
+  "desc" $desc)}}

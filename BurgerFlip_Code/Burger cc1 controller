@@ -80,6 +80,7 @@
   "raw" 0 "cooked" 0 "bun" 0 "let" 0 "tom" 0 "che" 0 "asm" 0
   "prep" 0 "served" 0 "cleans" 0 "mis" 0
   "wraw" 0 "wcooked" 0 "wbun" 0 "wlet" 0 "wtom" 0 "wche" 0
+  "tok" "" "tokt" 0
   "p1" (toString .User.ID) "p2" $p2id
   "t0" currentTime.Unix}}
 

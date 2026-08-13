@@ -32,7 +32,7 @@
   {{range $u := $yen}}{{$lived = $lived.Append $u}}{{end}}
 {{else}}
   {{range $u := $yen}}
-    {{if eq (randInt 2) 1}}{{$lived = $lived.Append $u}}
+    {{if lt (randInt 100) 75}}{{$lived = $lived.Append $u}}
     {{else}}{{$coindead = $coindead.Append $u}}{{end}}
   {{end}}
 {{end}}

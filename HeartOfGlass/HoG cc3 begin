@@ -1,11 +1,11 @@
 {{/* ═══ HEARTS OF GLASS · C · BEGIN ═══ */}}
 {{if not (hasPermissions .Permissions.ManageServer)}}{{return}}{{end}}
 
-{{$TIMER    := 120}}
+{{$TIMER    := 1800}}
 {{$RESOLVE  := 7}}{{/* ← CC D's ID goes here */}}
 
 {{$st := dbGet 0 "hogstate"}}
-{{if not $st}}{{sendMessage nil "No game open. Run `-HoGStart` first."}}{{return}}{{end}}
+{{if not $st}}{{sendMessage nil "No game open. Run -HoGStart`` first."}}{{return}}{{end}}
 {{if ne (toString $st.Value.phase) "lobby"}}
   {{sendMessage nil "Enrollment is not open."}}{{return}}
 {{end}}

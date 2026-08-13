@@ -10,7 +10,17 @@
   {{if ne $phase "lobby"}}Enrollment is closed.{{return}}{{end}}
   {{if dbGet .User.ID "hogvote"}}You are already in a cube.{{return}}{{end}}
   {{dbSetExpire .User.ID "hogvote" 0 7200}}
+  {{$n := dbCount "hogvote"}}
+  {{editMessage $s.ch (toString $s.msg) (complexMessage
+    "embed" (cembed
+      "title" "HEARTS OF GLASS"
+      "color" 2895667
+      "description" (toString $s.desc)
+      "footer" (sdict "text" (printf "Enrollment open · %d in the glass" $n)))
+    "buttons" (cslice
+      (cbutton "label" "Enter the cube" "custom_id" "hog-enter" "style" "secondary")))}}
   The glass closes around you. Wait for the game to start.
+{{else if or (hasSuffix $c "skull") (hasSuffix $c "yen")}}
 
 {{else if or (hasSuffix $c "skull") (hasSuffix $c "yen")}}
   {{if ne $phase "choice"}}The devices are not live.{{return}}{{end}}
