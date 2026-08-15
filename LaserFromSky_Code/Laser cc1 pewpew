@@ -1,0 +1,23 @@
+{{/* ═══ ROLE SWAP ═══ */}}
+{{$OLD := "1529090435186954240"}}{{/* role to remove */}}
+{{$NEW := "1533947393710493767"}}{{/* role to give */}}
+{{$IMG := "https://media.tenor.com/FxmTAUKBEQEAAAAd/laser-beam-gravitational-beam.gif"}}
+
+{{if not (hasPermissions .Permissions.ManageRoles)}}
+  {{sendMessage nil "You can't do that."}}{{return}}
+{{end}}
+
+{{$args := parseArgs 1 "Usage: `-pewpew <user>`" (carg "member" "target user")}}
+{{$t := ($args.Get 0)}}
+
+{{if not (targetHasRoleID $t.User.ID $OLD)}}
+  {{sendMessage nil (printf "<@%s> doesn't have that role." $t.User.ID)}}{{return}}
+{{end}}
+
+{{takeRoleID $t.User.ID $OLD}}
+{{giveRoleID $t.User.ID $NEW}}
+
+{{sendMessage nil (cembed
+  "color" 2895667
+  "description" (printf "**%s** has a laser blast through their skull." $t.User.Username)
+  "image" (sdict "url" $IMG))}}

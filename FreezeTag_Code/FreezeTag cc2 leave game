@@ -1,0 +1,15 @@
+{{$player := 1537630572849922090}}
+{{$red := 1533943824207056926}}
+{{$green := 1533943898815205437}}
+{{$frozen := 1533943304834777250}}
+
+{{if not (hasRoleID $player)}}
+You're not signed up.
+{{else}}
+{{if hasRoleID $red}}{{removeRoleID $red}}{{$d1 := dbIncr 0 "ft_red" -1}}{{end}}
+{{if hasRoleID $green}}{{removeRoleID $green}}{{$d2 := dbIncr 0 "ft_green" -1}}{{end}}
+{{removeRoleID $frozen}}
+{{removeRoleID $player}}
+{{$total := dbIncr 0 "ft_player" -1}}
+👋 {{.User.Mention}} left the game. Players remaining: **{{toInt $total}}**
+{{end}}

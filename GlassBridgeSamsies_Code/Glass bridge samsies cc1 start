@@ -1,0 +1,91 @@
+{{/* =========================================================================
+     GLASS BRIDGE · SAMSIES · Trigger Types
+     A(1) command           "glassbridgesamsies"
+     B(2) message component "^gbs:"
+     C(3) command           "gbsnew"
+     D(4) command           "gbsboard"
+     ========================================================================= */}}
+
+
+{{/* ═══ GLASS BRIDGE SAMSIES · 1 of 2 · LAUNCHER ═══ */}}
+{{ $STEPS := 12 }}
+{{ $COOLDOWN := 300 }}
+{{ $uid := .User.ID }}
+
+{{/* ── the one shared bridge ── */}}
+{{ $round := 1 }}{{ $path := "" }}{{ $marks := "" }}
+{{ $B := dbGet 0 "gbs_bridge" }}
+{{ if $B }}
+  {{ $b := split (toString $B.Value) "|" }}
+  {{ $round = toInt (index $b 0) }}{{ $path = index $b 1 }}{{ $marks = index $b 2 }}
+{{ else }}
+  {{ range seq 0 $STEPS }}
+    {{ $path = printf "%s%d" $path (randInt 2) }}
+    {{ $marks = printf "%s0" $marks }}
+  {{ end }}
+  {{ dbSet 0 "gbs_bridge" (printf "%d|%s|%s" $round $path $marks) }}
+{{ end }}
+
+{{/* ── this player's own position on it ── */}}
+{{ $step := 0 }}{{ $deaths := 0 }}
+{{ $save := dbGet $uid "gbs_game" }}
+{{ if $save }}
+  {{ $s := split (toString $save.Value) "|" }}
+  {{ if eq (toInt (index $s 0)) $round }}
+    {{ $step = toInt (index $s 1) }}{{ $deaths = toInt (index $s 2) }}
+  {{ end }}
+{{ end }}
+{{ dbSetExpire $uid "gbs_game" (printf "%d|%d|%d" $round $step $deaths) 604800 }}
+
+{{ $deadUntil := 0 }}
+{{ $cdE := dbGet $uid "gbs_dead" }}{{ if $cdE }}{{ $deadUntil = $cdE.ExpiresAt.Unix }}{{ end }}
+
+{{/* ── render ── */}}
+{{ $P := split $path "" }}{{ $M := split $marks "" }}
+{{ $known := 0 }}{{ range $c := $M }}{{ if eq $c "1" }}{{ $known = add $known 1 }}{{ end }}{{ end }}
+
+{{ $rows := "" }}
+{{ range $i := seq 0 $STEPS }}
+  {{ $idx := sub (sub $STEPS 1) $i }}
+  {{ $safe := index $P $idx }}{{ $broke := eq (index $M $idx) "1" }}
+  {{ $l := "⬜" }}{{ $r := "⬜" }}{{ $tag := "" }}
+  {{ if lt $idx $step }}
+    {{ if eq $safe "0" }}{{ $l = "🟦" }}{{ $r = "⬛" }}{{ else }}{{ $l = "⬛" }}{{ $r = "🟦" }}{{ end }}
+    {{ if $broke }}{{ if eq $safe "0" }}{{ $r = "💀" }}{{ else }}{{ $l = "💀" }}{{ end }}{{ end }}
+  {{ else if eq $idx $step }}
+    {{ if $broke }}
+      {{ if eq $safe "0" }}{{ $l = "🟩" }}{{ $r = "💥" }}{{ else }}{{ $l = "💥" }}{{ $r = "🟩" }}{{ end }}
+    {{ else }}{{ $l = "🟨" }}{{ $r = "🟨" }}{{ end }}
+    {{ $tag = " ⬅ **you**" }}
+  {{ else if $broke }}
+    {{/* intel from someone else's corpse, further up the bridge */}}
+    {{ if eq $safe "0" }}{{ $l = "🟩" }}{{ $r = "💀" }}{{ else }}{{ $l = "💀" }}{{ $r = "🟩" }}{{ end }}
+    {{ $tag = " 🔎" }}
+  {{ end }}
+  {{ $rows = printf "%s`%02d` %s %s%s\n" $rows (add $idx 1) $l $r $tag }}
+{{ end }}
+
+{{ $bar := "" }}
+{{ range $i := seq 0 $STEPS }}{{ if lt $i $step }}{{ $bar = printf "%s▰" $bar }}{{ else }}{{ $bar = printf "%s▱" $bar }}{{ end }}{{ end }}
+
+{{ $status := "" }}{{ $color := 10181046 }}
+{{ if $deadUntil }}
+  {{ $color = 15158332 }}
+  {{ $status = printf "💀 **You're still in the pit.** Back on your feet <t:%d:R>.\nYour fall was logged — step `%02d` is now marked for the whole server." $deadUntil (add $step 1) }}
+{{ else if eq $step 0 }}
+  {{ $status = "**Everyone is walking the same bridge.**\nEvery panel that shatters gets marked for all players. Go early and you're the map. Go late and you read one." }}
+{{ else }}
+  {{ $status = printf "You're standing on panel `%02d`. **%d** left." $step (sub $STEPS $step) }}
+{{ end }}
+
+{{ $embed := cembed
+  "title" "🌉 GLASS BRIDGE · SAMSIES"
+  "description" (printf "%s\n\n🏁 **THE OTHER SIDE**\n%s🧍 **START**\n\n%s `%d/%d`" $status $rows $bar $step $STEPS)
+  "color" $color
+  "thumbnail" (sdict "url" (.User.AvatarURL "128"))
+  "footer" (sdict "text" (printf "%s · round #%d · %d/%d panels mapped · your falls: %d" .User.Username $round $known $STEPS $deaths))
+}}
+
+{{ $bL := cbutton "label" "LEFT" "emoji" (sdict "name" "⬅️") "style" "primary" "custom_id" (printf "gbs:%d:%d:0" $uid $round) }}
+{{ $bR := cbutton "label" "RIGHT" "emoji" (sdict "name" "➡️") "style" "primary" "custom_id" (printf "gbs:%d:%d:1" $uid $round) }}
+{{ sendMessage nil (complexMessage "content" (printf "<@%d>" $uid) "embed" $embed "buttons" (cslice $bL $bR)) }}

@@ -1,0 +1,39 @@
+{{$player := 1537630572849922090}}
+{{$red := 1533943824207056926}}
+{{$green := 1533943898815205437}}
+{{$frozen := 1533943304834777250}}
+
+{{$target := ""}}
+{{if .Mentions}}{{$target = getMember (index .Mentions 0).ID}}
+{{else if gt (len .Args) 1}}{{$target = getMember (index .Args 1)}}{{end}}
+
+{{if not $target}}
+❄️ Usage: `-snowball @user`
+{{else if eq $target.User.ID .User.ID}}
+You can't snowball yourself.
+{{else if not (hasRoleID $player)}}
+You're not in the game — run `-signup` first.
+{{else if hasRoleID $frozen}}
+🧊 You're frozen solid. Get an `-iceslap` from a teammate first.
+{{else if not (targetHasRoleID $target.User.ID $player)}}
+**{{$target.User.Username}}** isn't in the game.
+{{else if targetHasRoleID $target.User.ID $frozen}}
+**{{$target.User.Username}}** is already frozen.
+{{else}}
+  {{$mine := ""}}
+  {{if hasRoleID $red}}{{$mine = "red"}}{{else if hasRoleID $green}}{{$mine = "green"}}{{end}}
+  {{$theirs := ""}}
+  {{if targetHasRoleID $target.User.ID $red}}{{$theirs = "red"}}
+  {{else if targetHasRoleID $target.User.ID $green}}{{$theirs = "green"}}{{end}}
+
+  {{if eq $mine ""}}
+You haven't picked a team yet — use the team panel.
+  {{else if eq $theirs ""}}
+**{{$target.User.Username}}** hasn't picked a team yet.
+  {{else if eq $mine $theirs}}
+No friendly fire! **{{$target.User.Username}}** is on your team.
+  {{else}}
+{{giveRoleID $target.User.ID $frozen}}
+❄️ **SPLAT!** {{.User.Mention}} nailed {{$target.User.Mention}} with a snowball — they're **frozen**! A teammate can free them with `-iceslap`.
+  {{end}}
+{{end}}

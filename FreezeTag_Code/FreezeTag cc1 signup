@@ -1,0 +1,21 @@
+{{/* =========================================================================
+     Trigger Types
+     A(1) command "freezesignup"
+     B(2) command "freezeleavegame"
+     C(3) command "freezeteampanel"
+     D(4) message component "ft-team-red"
+     E(5) command "snowball @username"
+	 F(6) command "iceslap @username"
+	 G(7) command  "ftreset"
+	 H(8) message component "ft-team-green"
+     ========================================================================= */}}
+
+{{$player := 1537630572849922090}}
+{{if hasRoleID $player}}
+You're already signed up, {{.User.Mention}}.
+{{else}}
+{{addRoleID $player}}
+{{$total := dbIncr 0 "ft_player" 1}}
+✅ {{.User.Mention}} joined the game! Players signed up: **{{toInt $total}}**
+Head to the team panel to pick a side.
+{{end}}

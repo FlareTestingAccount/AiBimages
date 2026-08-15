@@ -1,0 +1,2 @@
+{{dbDelMultiple (sdict "pattern" "ft_%") 10000 0}}
+🧹 Freeze tag sign-up data cleared. Everyone needs to `-signup` again.

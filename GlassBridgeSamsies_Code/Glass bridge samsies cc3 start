@@ -1,0 +1,14 @@
+{{ $STEPS := 12 }}
+{{ $round := 1 }}
+{{ $B := dbGet 0 "gbs_bridge" }}
+{{ if $B }}{{ $round = add (toInt (index (split (toString $B.Value) "|") 0)) 1 }}{{ end }}
+
+{{ $np := "" }}{{ $nm := "" }}
+{{ range seq 0 $STEPS }}{{ $np = printf "%s%d" $np (randInt 2) }}{{ $nm = printf "%s0" $nm }}{{ end }}
+{{ dbSet 0 "gbs_bridge" (printf "%d|%s|%s" $round $np $nm) }}
+
+{{ sendMessage nil (cembed
+  "title" "🧨 NEW BRIDGE"
+  "color" 15158332
+  "description" (printf "The old bridge is gone. **Round #%d** is laid — %d fresh panels, zero intel.\n\nEveryone's progress has been wiped. `-glassbridgesamsies` to step on." $round $STEPS)
+  "footer" (sdict "text" (printf "Laid by %s" .User.Username))) }}

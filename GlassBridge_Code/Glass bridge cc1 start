@@ -1,0 +1,80 @@
+{{/* =========================================================================
+     Trigger Types
+     A(1) command "glassbridge"
+     B(2) message component "gb:"
+     ========================================================================= */}}
+
+{{/* ═══ GLASS BRIDGE · 1 of 2 · LAUNCHER ═══ */}}
+{{ $STEPS := 12 }}
+{{ $COOLDOWN := 300 }}
+
+{{ $uid := .User.ID }}
+{{ $gid := printf "%d" (randInt 100000 999999) }}
+{{ $step := 0 }}{{ $deaths := 0 }}{{ $path := "" }}{{ $marks := "" }}{{ $deadUntil := 0 }}
+
+{{ $cdE := dbGet $uid "gb_dead" }}
+{{ if $cdE }}{{ $deadUntil = $cdE.ExpiresAt.Unix }}{{ end }}
+
+{{/* resume an existing run, or lay a new bridge */}}
+{{ $save := dbGet $uid "gb_game" }}
+{{ if $save }}
+  {{ $s := split (toString $save.Value) "|" }}
+  {{ $step = toInt (index $s 1) }}{{ $deaths = toInt (index $s 2) }}
+  {{ $path = index $s 3 }}{{ $marks = index $s 4 }}
+{{ else }}
+  {{ if $cdE }}
+    {{ sendMessage nil (printf "<@%d> You're still face-down on the floor. Try again <t:%d:R>." $uid $deadUntil) }}
+    {{ return }}
+  {{ end }}
+  {{ range seq 0 $STEPS }}
+    {{ $path = printf "%s%d" $path (randInt 2) }}
+    {{ $marks = printf "%s0" $marks }}
+  {{ end }}
+{{ end }}
+
+{{ dbSetExpire $uid "gb_game" (printf "%s|%d|%d|%s|%s" $gid $step $deaths $path $marks) 604800 }}
+
+{{/* ── render ── */}}
+{{ $P := split $path "" }}{{ $M := split $marks "" }}
+{{ $rows := "" }}
+{{ range $i := seq 0 $STEPS }}
+  {{ $idx := sub (sub $STEPS 1) $i }}
+  {{ $safe := index $P $idx }}{{ $broke := eq (index $M $idx) "1" }}
+  {{ $l := "⬜" }}{{ $r := "⬜" }}{{ $tag := "" }}
+  {{ if lt $idx $step }}
+    {{ if eq $safe "0" }}{{ $l = "🟦" }}{{ $r = "⬛" }}{{ else }}{{ $l = "⬛" }}{{ $r = "🟦" }}{{ end }}
+    {{ if $broke }}{{ if eq $safe "0" }}{{ $r = "💀" }}{{ else }}{{ $l = "💀" }}{{ end }}{{ end }}
+  {{ else if eq $idx $step }}
+    {{ if $broke }}
+      {{ if eq $safe "0" }}{{ $l = "🟩" }}{{ $r = "💥" }}{{ else }}{{ $l = "💥" }}{{ $r = "🟩" }}{{ end }}
+    {{ else }}{{ $l = "🟨" }}{{ $r = "🟨" }}{{ end }}
+    {{ $tag = " ⬅ **you**" }}
+  {{ end }}
+  {{ $rows = printf "%s`%02d` %s %s%s\n" $rows (add $idx 1) $l $r $tag }}
+{{ end }}
+
+{{ $bar := "" }}
+{{ range $i := seq 0 $STEPS }}{{ if lt $i $step }}{{ $bar = printf "%s▰" $bar }}{{ else }}{{ $bar = printf "%s▱" $bar }}{{ end }}{{ end }}
+
+{{ $status := "" }}{{ $color := 3066993 }}
+{{ if $deadUntil }}
+  {{ $color = 15158332 }}
+  {{ $status = printf "💀 **You're still in the pit.** Back on your feet <t:%d:R>.\nThe fake panel on step `%02d` is marked — step on the one that held." $deadUntil (add $step 1) }}
+{{ else if eq $step 0 }}
+  {{ $status = "Two panels every step. One is tempered glass. One is not.\nPick a side." }}
+{{ else }}
+  {{ $status = printf "You're standing on panel `%02d`. **%d** left." $step (sub $STEPS $step) }}
+{{ end }}
+
+{{ $embed := cembed
+  "title" "🌉 GLASS BRIDGE"
+  "description" (printf "%s\n\n🏁 **THE OTHER SIDE**\n%s🧍 **START**\n\n%s `%d/%d`" $status $rows $bar $step $STEPS)
+  "color" $color
+  "thumbnail" (sdict "url" (.User.AvatarURL "128"))
+  "footer" (sdict "text" (printf "%s · falls: %d · a fall costs you 15 minutes" .User.Username $deaths))
+}}
+
+{{ $bL := cbutton "label" "LEFT" "emoji" (sdict "name" "⬅️") "style" "primary" "custom_id" (printf "gb:%d:%s:0" $uid $gid) }}
+{{ $bR := cbutton "label" "RIGHT" "emoji" (sdict "name" "➡️") "style" "primary" "custom_id" (printf "gb:%d:%s:1" $uid $gid) }}
+
+{{ sendMessage nil (complexMessage "content" (printf "<@%d>" $uid) "embed" $embed "buttons" (cslice $bL $bR)) }}

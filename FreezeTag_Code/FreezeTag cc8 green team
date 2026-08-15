@@ -1,0 +1,39 @@
+{{$player := 1537630572849922090}}
+{{$redRole := 1533943824207056926}}
+{{$greenRole := 1533943898815205437}}
+
+{{$e1 := dbGet 0 "ft_player"}}{{$total := 0}}{{if $e1}}{{$total = toInt $e1.Value}}{{end}}
+{{$e2 := dbGet 0 "ft_red"}}{{$r := 0}}{{if $e2}}{{$r = toInt $e2.Value}}{{end}}
+{{$e3 := dbGet 0 "ft_green"}}{{$g := 0}}{{if $e3}}{{$g = toInt $e3.Value}}{{end}}
+{{if lt $r 0}}{{$r = 0}}{{end}}
+{{if lt $g 0}}{{$g = 0}}{{end}}
+{{$cap := div (add $total 1) 2}}{{if lt $cap 1}}{{$cap = 1}}{{end}}
+
+{{$err := ""}}
+{{if not (hasRoleID $player)}}
+  {{$err = "You need to sign up first — run `-signup`, then click again."}}
+{{else if hasRoleID $greenRole}}
+  {{$err = "You're already on 🟢 Green Team."}}
+{{else if ge $g $cap}}
+  {{$err = printf "🟢 Green Team is full (%d/%d). Take the other side!" $g $cap}}
+{{else}}
+  {{if hasRoleID $redRole}}{{removeRoleID $redRole}}{{$d1 := dbIncr 0 "ft_red" -1}}{{$r = sub $r 1}}{{end}}
+  {{addRoleID $greenRole}}{{$d2 := dbIncr 0 "ft_green" 1}}{{$g = add $g 1}}
+{{end}}
+
+{{if ne $err ""}}
+{{ephemeralResponse}}{{$err}}
+{{else}}
+{{$embed := cembed
+  "title" "❄️ Freeze Tag — Pick Your Team"
+  "description" (printf "Signed-up players: **%d**\nMax per team: **%d**\n\nNot signed up yet? Run `-signup` first." $total $cap)
+  "color" 5793266
+  "fields" (cslice
+    (sdict "name" "🔴 Red Team" "value" (printf "**%d / %d**" $r $cap) "inline" true)
+    (sdict "name" "🟢 Green Team" "value" (printf "**%d / %d**" $g $cap) "inline" true))
+}}
+{{$buttons := cslice
+  (cbutton "label" "Red Team" "style" "danger" "custom_id" "ft-team-red")
+  (cbutton "label" "Green Team" "style" "success" "custom_id" "ft-team-green")}}
+{{updateMessage (complexMessage "embed" $embed "buttons" $buttons)}}
+{{end}}

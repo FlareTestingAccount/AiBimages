@@ -1,0 +1,35 @@
+{{$player := 1537630572849922090}}
+{{$red := 1533943824207056926}}
+{{$green := 1533943898815205437}}
+{{$frozen := 1533943304834777250}}
+
+{{$target := ""}}
+{{if .Mentions}}{{$target = getMember (index .Mentions 0).ID}}
+{{else if gt (len .Args) 1}}{{$target = getMember (index .Args 1)}}{{end}}
+
+{{if not $target}}
+🖐️ Usage: `-iceslap @user`
+{{else if eq $target.User.ID .User.ID}}
+You can't unfreeze yourself.
+{{else if not (hasRoleID $player)}}
+You're not in the game — run `-signup` first.
+{{else if hasRoleID $frozen}}
+🧊 You're frozen yourself — you can't slap anyone free.
+{{else if not (targetHasRoleID $target.User.ID $frozen)}}
+**{{$target.User.Username}}** isn't frozen.
+{{else}}
+  {{$mine := ""}}
+  {{if hasRoleID $red}}{{$mine = "red"}}{{else if hasRoleID $green}}{{$mine = "green"}}{{end}}
+  {{$theirs := ""}}
+  {{if targetHasRoleID $target.User.ID $red}}{{$theirs = "red"}}
+  {{else if targetHasRoleID $target.User.ID $green}}{{$theirs = "green"}}{{end}}
+
+  {{if eq $mine ""}}
+You haven't picked a team yet — use the team panel.
+  {{else if ne $mine $theirs}}
+That's an enemy player — you can only thaw your own teammates.
+  {{else}}
+{{takeRoleID $target.User.ID $frozen}}
+🖐️ **SLAP!** {{.User.Mention}} thawed out {{$target.User.Mention}}. Back in the game!
+  {{end}}
+{{end}}

@@ -1,0 +1,17 @@
+{{ $top := dbTopEntries "gbs_wins" 10 0 }}
+{{ if not $top }}
+🌉 Nobody has crossed yet.
+{{ else }}
+{{ $out := "" }}{{ $medals := cslice "🥇" "🥈" "🥉" }}
+{{ range $i, $e := $top }}
+  {{ $m := "🔹" }}{{ if lt $i 3 }}{{ $m = index $medals $i }}{{ end }}
+  {{ $out = printf "%s%s <@%v> — **%v**\n" $out $m $e.UserID $e.Value }}
+{{ end }}
+{{ $clears := 0 }}
+{{ $c := dbGet 0 "gbs_clears" }}{{ if $c }}{{ $clears = $c.Value }}{{ end }}
+{{ sendMessage nil (cembed
+  "title" "🏁 Samsies Crossings"
+  "color" 16766720
+  "description" $out
+  "footer" (sdict "text" (printf "%v total clears" $clears))) }}
+{{ end }}
