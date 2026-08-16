@@ -1,0 +1,26 @@
+{{- $gen := 1 -}}
+{{- $g := dbGet 0 "cipher_gen" }}{{ if $g }}{{ $gen = toInt $g.Value }}{{ end -}}
+
+{{- $target := .User -}}
+{{- if gt (len .Args) 1 }}{{ $m := userArg (index .Args 1) }}{{ if $m }}{{ $target = $m }}{{ end }}{{ end -}}
+
+{{- $d := dbGet $target.ID "cipher_set" -}}
+{{- $valid := false -}}
+{{- if $d }}{{ if eq (toInt (index (split $d.Value "|") 0)) $gen }}{{ $valid = true }}{{ end }}{{ end -}}
+
+{{- if not $valid -}}
+🎰 {{ if eq $target.ID .User.ID }}You don't{{ else }}**{{ $target.Username }}** doesn't{{ end }} have a set yet — run `-spin` to get one.
+{{- else -}}
+  {{- $p := split $d.Value "|" -}}
+  {{- $L := split (index $p 1) " " }}{{ $N := split (index $p 2) " " -}}
+  {{- sendMessage nil (cembed
+      "title" "🔒 Locked Cipher Set"
+      "color" 5814783
+      "description" (printf "```\n╔═══╦═══╦═══╗\n║ %s ║ %s ║ %s ║\n╚═══╩═══╩═══╝\n```" (index $L 0) (index $L 1) (index $L 2))
+      "fields" (cslice
+        (sdict "name" (printf "🔑 %s" (index $L 0)) "value" (printf "`%s`" (index $N 0)) "inline" true)
+        (sdict "name" (printf "🔑 %s" (index $L 1)) "value" (printf "`%s`" (index $N 1)) "inline" true)
+        (sdict "name" (printf "🔑 %s" (index $L 2)) "value" (printf "`%s`" (index $N 2)) "inline" true))
+      "thumbnail" (sdict "url" ($target.AvatarURL "256"))
+      "footer" (sdict "text" $target.Username)) -}}
+{{- end -}}

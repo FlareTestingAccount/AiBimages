@@ -1,0 +1,33 @@
+{{/* =========================================================================
+     Trigger Types
+     A(1)  command           "scjoin"
+     B(2)  command           "scleave"
+     C(3)  command           "scpanel"
+     D(4)  message component "^sc-start$"
+     E(5)  command           "sccheckpanel"
+     F(6)  message component "^sc-check$"
+     G(7)  command           "scchoice"
+     H(8)  message component "^sc-pick-spades$"
+     I(9)  message component "^sc-pick-hearts$"
+     J(10) message component "^sc-pick-clubs$"
+     K(11) message component "^sc-pick-diamonds$"
+     L(12) none
+     M(13) command           "screset"
+     ========================================================================= */}}
+
+{{$id := toString .User.ID}}
+{{$e := dbGet 0 "sc_players"}}
+{{$d := sdict}}
+{{if $e}}{{range $k, $v := $e.Value}}{{$d.Set $k $v}}{{end}}{{end}}
+
+{{if $d.Get $id}}You're already signed up, {{.User.Mention}}. Players: **{{len $d}}**{{return}}{{end}}
+
+{{$n := dbGet 0 "sc_names"}}
+{{$names := sdict}}
+{{if $n}}{{range $k, $v := $n.Value}}{{$names.Set $k $v}}{{end}}{{end}}
+{{$names.Set $id .User.Username}}
+{{$d.Set $id "none"}}
+{{dbSet 0 "sc_players" $d}}
+{{dbSet 0 "sc_names" $names}}
+🂠 {{.User.Mention}} joined Solitary Confinement. Players signed up: **{{len $d}}**
+Hosts: re-run `-sccheckpanel` so the new name appears in the menu.

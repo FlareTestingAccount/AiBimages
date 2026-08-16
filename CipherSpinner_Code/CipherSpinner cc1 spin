@@ -1,0 +1,85 @@
+{{/* =========================================================================
+     Trigger Types
+     A(1) command "cipherspin"
+     B(2) command "letters"
+     C(3) command "resetcipher" / "resetcipher @user"
+     ========================================================================= */}}
+
+
+{{/* ══════════ BINGO CIPHER SPINNER ══════════ */}}
+
+{{- $KEY := sdict
+  "A" 62 "B" 16 "C" 82 "D" 27 "E" 88 "F" 5 "G" 7 "H" 55 "I" 45 "J" 100 "K" 77 "L" 9 "M" 57
+  "N" 81 "O" 22 "P" 92 "Q" 21 "R" 30 "S" 37 "T" 80 "U" 38 "V" 43 "W" 59 "X" 39 "Y" 64 "Z" 49 -}}
+
+{{- $ALPHA := cslice "A" "B" "C" "D" "E" "F" "G" "H" "I" "J" "K" "L" "M"
+                     "N" "O" "P" "Q" "R" "S" "T" "U" "V" "W" "X" "Y" "Z" -}}
+
+{{/* ── current generation ── */}}
+{{- $gen := 1 -}}
+{{- $g := dbGet 0 "cipher_gen" }}{{ if $g }}{{ $gen = toInt $g.Value }}{{ end -}}
+
+{{/* ── already locked in? ── */}}
+{{- $d := dbGet .User.ID "cipher_set" -}}
+{{- $locked := false -}}
+{{- if $d }}{{ if eq (toInt (index (split $d.Value "|") 0)) $gen }}{{ $locked = true }}{{ end }}{{ end -}}
+
+{{- if $locked -}}
+  {{- $p := split $d.Value "|" -}}
+  {{- $L := split (index $p 1) " " }}{{ $N := split (index $p 2) " " -}}
+  {{- sendMessage nil (cembed
+      "title" "🔒 Your Set Is Locked"
+      "color" 15105570
+      "description" (printf "```\n╔═══╦═══╦═══╗\n║ %s ║ %s ║ %s ║\n╚═══╩═══╩═══╝\n```\n`%s = %s`  •  `%s = %s`  •  `%s = %s`"
+          (index $L 0) (index $L 1) (index $L 2)
+          (index $L 0) (index $N 0) (index $L 1) (index $N 1) (index $L 2) (index $N 2))
+      "thumbnail" (sdict "url" (.User.AvatarURL "256"))
+      "footer" (sdict "text" "An admin must run -resetcipher before you can spin again.")) -}}
+
+{{- else -}}
+
+  {{/* ── roll the real result first so reels can lock into it one by one ── */}}
+  {{- $pick := shuffle $ALPHA -}}
+  {{- $a := index $pick 0 }}{{ $b := index $pick 1 }}{{ $c := index $pick 2 -}}
+  {{- $na := $KEY.Get $a }}{{ $nb := $KEY.Get $b }}{{ $nc := $KEY.Get $c -}}
+
+  {{- $fx := cslice "🎰" "🌀" "✨" "💫" "🔮" -}}
+  {{- $flavor := cslice
+       "Pulling the lever…"
+       "Reels are screaming…"
+       "🔒 Reel 1 locked!"
+       "🔒 Reel 2 locked!"
+       "🔒 Reel 3 locked! Decoding cipher…" -}}
+
+  {{- $msg := sendMessageRetID nil "🎰 **B I N G O   C I P H E R** 🎰\n```\n╔═══╦═══╦═══╗\n║ ? ║ ? ║ ? ║\n╚═══╩═══╩═══╝\n```\n*Inserting coin…*" -}}
+
+  {{- range $i := seq 0 5 -}}
+    {{- sleep 1 -}}
+    {{- $r1 := index (shuffle $ALPHA) 0 -}}
+    {{- $r2 := index (shuffle $ALPHA) 0 -}}
+    {{- $r3 := index (shuffle $ALPHA) 0 -}}
+    {{- if ge $i 2 }}{{ $r1 = $a }}{{ end -}}
+    {{- if ge $i 3 }}{{ $r2 = $b }}{{ end -}}
+    {{- if ge $i 4 }}{{ $r3 = $c }}{{ end -}}
+    {{- $e := index $fx $i -}}
+    {{- editMessage nil $msg (printf "%s **B I N G O   C I P H E R** %s\n```\n╔═══╦═══╦═══╗\n║ %s ║ %s ║ %s ║\n╚═══╩═══╩═══╝\n```\n*%s*" $e $e $r1 $r2 $r3 (index $flavor $i)) -}}
+  {{- end -}}
+
+  {{- sleep 1 -}}
+
+  {{/* ── stamp with the current generation and lock it in ── */}}
+  {{- $total := add $na (add $nb $nc) -}}
+  {{- dbSet .User.ID "cipher_set" (printf "%v|%s %s %s|%v %v %v" $gen $a $b $c $na $nb $nc) -}}
+
+  {{- editMessage nil $msg (cembed
+      "title" "🎉  B I N G O !  🎉"
+      "color" 16766720
+      "description" (printf "```\n╔═══╦═══╦═══╗\n║ %s ║ %s ║ %s ║\n╚═══╩═══╩═══╝\n```" $a $b $c)
+      "fields" (cslice
+        (sdict "name" (printf "🔑 %s" $a) "value" (printf "`%v`" $na) "inline" true)
+        (sdict "name" (printf "🔑 %s" $b) "value" (printf "`%v`" $nb) "inline" true)
+        (sdict "name" (printf "🔑 %s" $c) "value" (printf "`%v`" $nc) "inline" true)
+        (sdict "name" "🧮 Total" "value" (printf "**%v**" $total) "inline" false))
+      "thumbnail" (sdict "url" (.User.AvatarURL "256"))
+      "footer" (sdict "text" (printf "%s • locked in until an admin resets" .User.Username))) -}}
+{{- end -}}
